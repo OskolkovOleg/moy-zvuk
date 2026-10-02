@@ -1,0 +1,5 @@
+# Логотип «Мой Звук»
+
+`icon.png` — исходный растровый знак, созданный встроенным ImageGen. Android-ресурсы уменьшены из него без изменения рисунка. Палитра: лаймовый `#C9F779`, графитовый `#101113`.
+
+Промпт: «Create one finished Android app icon for an independent personal music player called Мой Звук. A striking, minimal, original abstract sound-wave emblem, five rounded vertical strokes subtly forming a musical M / flowing waveform, with a small sense of upward movement suggesting a personal music ranking. Bright soft lime #C9F779 mark on solid near-black graphite #101113. Sophisticated geometric construction, generous negative space, crisp clean edges, balanced optical weight, highly recognizable at 48 pixels. The emblem fits entirely inside the central 58% of a square canvas. Flat vector-like finish, no 3D, no shadows, no glow, no gradients, no text or letters rendered as text, no watermark. Not the official Sber/Zvuk logo. Opaque square background extends to every edge, no rounded exterior tile border, no phone mockup, no presentation sheet, just the final single square app icon at high resolution.»
