@@ -29,6 +29,13 @@ icon = re.search(r"androidNotificationIcon:\s*'([^']+)'", config)
 if not icon:
     sys.exit('Could not find the notification icon configuration.')
 result = subprocess.run([aapt, 'dump', 'resources', str(apk)], capture_output=True, text=True, check=True)
-if not re.search(r'\b' + re.escape(icon.group(1)) + r'\s', result.stdout):
-    sys.exit(f'Release APK is missing {icon.group(1)}: playback would crash. Check res/raw/keep.xml.')
-print(f'Release notification resource verified: {icon.group(1)}')
+# MediaControl's built-in action icons are also looked up by name from Dart.
+# A notification may have working actions yet render no buttons without them.
+required = [icon.group(1)] + [
+    'drawable/audio_service_' + name
+    for name in ['skip_previous', 'play_arrow', 'pause', 'skip_next', 'stop']
+]
+missing = [name for name in required if not re.search(r'\b' + re.escape(name) + r'\s', result.stdout)]
+if missing:
+    sys.exit('Release APK is missing notification resources: ' + ', '.join(missing) + '. Check res/raw/keep.xml.')
+print(f'Release notification and action icons verified: {len(required)} resources')

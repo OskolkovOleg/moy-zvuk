@@ -244,7 +244,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: LinearProgressIndicator(),
         ),
       const SizedBox(height: 36),
-      Text('Мой Звук · 1.2.1', style: Theme.of(context).textTheme.titleMedium),
+      Text('Мой Звук · 1.2.2', style: Theme.of(context).textTheme.titleMedium),
       const SizedBox(height: 8),
       Text(
         'Личное неофициальное приложение. Порядок и оценки хранятся на телефоне. Воспроизведение требует интернета и доступа к треку в Звуке.',
@@ -255,7 +255,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         onPressed: () => showLicensePage(
           context: context,
           applicationName: 'Мой Звук',
-          applicationVersion: '1.2.1',
+          applicationVersion: '1.2.2',
         ),
         child: const Text('Лицензии компонентов'),
       ),
