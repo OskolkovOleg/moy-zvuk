@@ -5,6 +5,7 @@ import '../data/models.dart';
 import '../data/catalog_models.dart';
 import 'catalog_widgets.dart';
 import 'widgets.dart';
+import 'lyrics_screen.dart';
 
 Future<void> openTrackActions(
   BuildContext context,
@@ -37,6 +38,7 @@ Future<void> openTrackActions(
                 app.isFavorite(track.id) ? 'Убрать из любимого' : 'В любимое',
               ),
               ('playlist', Icons.library_add_outlined, 'В плейлист'),
+              ('lyrics', Icons.lyrics_outlined, 'Текст песни'),
               if (track.artistIds.isNotEmpty)
                 ('artist', Icons.person_outline_rounded, 'К артисту'),
               if (track.releaseId != null)
@@ -80,6 +82,8 @@ Future<void> openTrackActions(
                 : 'Убрано из любимого',
           );
         }
+      case 'lyrics':
+        await openLyrics(context, app, track);
       case 'playlist':
         await chooseTrackPlaylist(context, app, track);
       case 'artist':

@@ -24,6 +24,12 @@ class _CatalogDetailScreenState extends State<CatalogDetailScreen> {
   void initState() {
     super.initState();
     load();
+    if (widget.item.kind == CatalogKind.album ||
+        widget.item.kind == CatalogKind.artist) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.app.refreshSavedCatalog();
+      });
+    }
   }
 
   Future<void> load() async {
@@ -222,6 +228,31 @@ class _CatalogDetailScreenState extends State<CatalogDetailScreen> {
                                   icon: const Icon(Icons.shuffle_rounded),
                                   label: const Text('Перемешать'),
                                 ),
+                                if (data.item.kind == CatalogKind.album ||
+                                    data.item.kind == CatalogKind.artist)
+                                  OutlinedButton.icon(
+                                    onPressed:
+                                        editing ||
+                                            app.serverBusy ||
+                                            !app.savedCatalogKnown
+                                        ? null
+                                        : () => change(
+                                            () => app.saveCatalogItem(
+                                              data.item,
+                                              !app.hasCatalogItem(data.item),
+                                            ),
+                                          ),
+                                    icon: Icon(
+                                      app.hasCatalogItem(data.item)
+                                          ? Icons.bookmark_rounded
+                                          : Icons.bookmark_border_rounded,
+                                    ),
+                                    label: Text(
+                                      app.hasCatalogItem(data.item)
+                                          ? 'Сохранено'
+                                          : 'Сохранить',
+                                    ),
+                                  ),
                                 if (p != null && !app.owns(p))
                                   OutlinedButton.icon(
                                     onPressed: editing || app.serverBusy
@@ -245,6 +276,11 @@ class _CatalogDetailScreenState extends State<CatalogDetailScreen> {
                                   ),
                               ],
                             ),
+                            if (p == null && app.savedCatalogError != null)
+                              CatalogFailure(
+                                app.savedCatalogError!,
+                                app.refreshSavedCatalog,
+                              ),
                             if (editing || busy)
                               const Padding(
                                 padding: EdgeInsets.only(top: 12),

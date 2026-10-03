@@ -4,10 +4,13 @@ import 'package:flutter/foundation.dart';
 
 import 'data/library_store.dart';
 import 'data/models.dart';
+import 'data/catalog_models.dart';
 import 'data/token_store.dart';
 import 'data/zvuk_api.dart';
 import 'playback/music_handler.dart';
 import 'playback/shuffle_tracks.dart';
+
+part 'personal_controller.dart';
 
 class AppController extends ChangeNotifier {
   AppController(this.store, this.music, {this.tokens = const TokenStore()});
@@ -27,6 +30,11 @@ class AppController extends ChangeNotifier {
   int _selection = 0, _catalogRevision = 0;
   int libraryRequests = 0;
   List<Track> favoriteTracks = [];
+  List<CatalogItem> savedCatalogItems = [];
+  bool savedCatalogKnown = false, savedCatalogLoading = false;
+  String? savedCatalogError;
+  int _savedRequest = 0;
+  void _notifySavedCatalog() => notifyListeners();
   bool serverBusy = false;
   Future<void> _edits = Future.value();
   bool isFavorite(String id) => favoriteTracks.any((t) => t.id == id);
@@ -122,6 +130,13 @@ class AppController extends ChangeNotifier {
 
   Future<void> _loadCache() async {
     final id = account!.id;
+    final saved = await store.get(id, 'saved-catalog');
+    savedCatalogKnown = saved is List;
+    savedCatalogItems = (saved as List? ?? [])
+        .map((j) => CatalogItem.fromJson(j))
+        .toList();
+    savedCatalogError = null;
+    savedCatalogLoading = false;
     favoriteTracks = await store.loadTracks(id, 'favorites');
     tracks = listId == 'favorites'
         ? favoriteTracks
@@ -156,6 +171,9 @@ class AppController extends ChangeNotifier {
         tracks = [];
         ratings = {};
         playlists = [];
+        savedCatalogItems = [];
+        savedCatalogKnown = false;
+        ++_savedRequest;
       }
       await music.configure(profile.id, candidate);
       previousApi?.close();
@@ -177,6 +195,7 @@ class AppController extends ChangeNotifier {
 
   Future<void> refresh() async {
     if (busy || serverBusy || api == null || account == null) return;
+    unawaited(refreshSavedCatalog());
     final id = account!.id, selected = listId;
     final requestApi = api!;
     final revision = _catalogRevision;

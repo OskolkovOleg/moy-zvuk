@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../app_controller.dart';
+import '../data/catalog_models.dart';
+import '../data/models.dart';
+import 'saved_catalog_screen.dart';
+import 'history_screen.dart';
 import 'widgets.dart';
 import 'shuffle_sheet.dart';
 
@@ -65,7 +69,7 @@ class LibraryScreen extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final largeText = MediaQuery.textScalerOf(context).scale(13) > 17;
     final trackCount = Text(
-      '${tracks.length} треков',
+      trackCountLabel(tracks.length),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
@@ -114,6 +118,42 @@ class LibraryScreen extends StatelessWidget {
                         tooltip: 'Обновить библиотеку',
                         onPressed: app.busy ? null : app.refresh,
                         icon: const Icon(Icons.refresh_rounded, size: 22),
+                      ),
+                    ],
+                  ),
+                ),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    children: [
+                      for (final kind in [
+                        CatalogKind.album,
+                        CatalogKind.artist,
+                      ])
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ActionChip(
+                            avatar: Icon(
+                              kind == CatalogKind.album
+                                  ? Icons.album_outlined
+                                  : Icons.person_outline_rounded,
+                              size: 18,
+                            ),
+                            label: Text(kind.label),
+                            onPressed: () => Navigator.of(context).push<void>(
+                              MaterialPageRoute(
+                                builder: (_) => SavedCatalogScreen(app, kind),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ActionChip(
+                        avatar: const Icon(Icons.history_rounded, size: 18),
+                        label: const Text('История'),
+                        onPressed: () => Navigator.of(context).push<void>(
+                          MaterialPageRoute(builder: (_) => HistoryScreen(app)),
+                        ),
                       ),
                     ],
                   ),

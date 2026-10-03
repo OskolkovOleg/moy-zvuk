@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../app_controller.dart';
 import '../playback/music_handler.dart';
 import 'widgets.dart';
+import 'lyrics_screen.dart';
 
 void openPlayer(BuildContext context, AppController app) =>
     Navigator.of(context).push(
@@ -419,6 +420,14 @@ class _PlayerSheetState extends State<PlayerSheet> {
                                   ],
                                 ),
                                 const SizedBox(height: 20),
+                                Center(
+                                  child: TextButton.icon(
+                                    onPressed: () =>
+                                        openLyrics(context, app, track),
+                                    icon: const Icon(Icons.lyrics_outlined),
+                                    label: const Text('Текст песни'),
+                                  ),
+                                ),
                                 if (music.error.value != null)
                                   Padding(
                                     padding: const EdgeInsets.only(bottom: 12),

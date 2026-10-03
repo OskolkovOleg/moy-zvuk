@@ -227,12 +227,21 @@ extension ZvukCatalog on ZvukApi {
     String id, {
     required bool liked,
     bool playlist = false,
+    CatalogKind kind = CatalogKind.track,
   }) async {
     final action = liked ? 'addItem' : 'removeItem';
     final data = await _graph(
       'changeCollection',
       'mutation changeCollection(\$id: ID, \$type: CollectionItemType) { collection { $action(id: \$id, type: \$type) } }',
-      {'id': id, 'type': playlist ? 'playlist' : 'track'},
+      {
+        'id': id,
+        'type': playlist
+            ? 'playlist'
+            : switch (kind) {
+                CatalogKind.album => 'release',
+                _ => kind.name,
+              },
+      },
     );
     _checkMutation(data['collection'], action);
   }

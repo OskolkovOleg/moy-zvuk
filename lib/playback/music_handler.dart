@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../data/library_store.dart';
+import '../data/history_store.dart';
 import '../data/models.dart';
 import '../data/zvuk_api.dart';
 import 'playback_queue.dart';
@@ -24,6 +25,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
       // Playing can change separately from playbackEventStream (audio focus,
       // pause/resume). Keep the Android MediaSession in sync in every case.
       _broadcast();
+      _recordListening();
       _maybeAdvance();
     });
     _timer = Timer.periodic(const Duration(seconds: 10), (_) {
@@ -133,6 +135,29 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
   ZvukApi? _api;
   String? _account;
   bool _loaded = false, _loading = false, _advancing = false;
+  bool _historyRecorded = false;
+  Future<void> _historyWrite = Future.value();
+
+  void _recordListening() {
+    final account = _account, track = playlist.current;
+    if (_historyRecorded ||
+        !_loaded ||
+        _loading ||
+        !player.playing ||
+        player.processingState != ProcessingState.ready ||
+        account == null ||
+        track == null) {
+      return;
+    }
+    _historyRecorded = true;
+    final at = DateTime.now();
+    _historyWrite = _historyWrite
+        .then((_) => HistoryStore(store).record(account, track, at))
+        .catchError((_) {
+          // A history write must never interrupt playback.
+        });
+  }
+
   int _generation = 0;
   Duration _restoredPosition = Duration.zero;
   Future<void> _pending = Future.value();
@@ -171,6 +196,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     _api = api;
     _account = account;
     _loaded = false;
+    _historyRecorded = false;
     playlist.replace([], 0);
     sourceTitle = 'Очередь';
     isShuffled = false;
@@ -299,6 +325,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     final track = playlist.current;
     final api = _api;
     _loaded = false;
+    _historyRecorded = false;
     _loading = track != null;
     error.value = null;
     // Stop promptly, then serialize source loading so an older HTTP request
@@ -481,6 +508,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     await stop();
     _cancelWave();
     await player.dispose();
+    await _historyWrite;
     error.dispose();
     revision.dispose();
   }

@@ -28,6 +28,20 @@ class CatalogItem {
   final String id, title, subtitle;
   final String? imageUrl;
   final CatalogKind kind;
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'kind': kind.name,
+    'subtitle': subtitle,
+    'imageUrl': imageUrl,
+  };
+  factory CatalogItem.fromJson(Map<String, dynamic> j) => CatalogItem(
+    id: j['id'] as String,
+    title: j['title'] as String,
+    kind: CatalogKind.values.byName(j['kind'] as String),
+    subtitle: j['subtitle'] as String? ?? '',
+    imageUrl: j['imageUrl'] as String?,
+  );
   factory CatalogItem.fromApi(Map<String, dynamic> j, CatalogKind kind) =>
       CatalogItem(
         id: j['id'].toString(),

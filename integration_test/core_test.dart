@@ -11,10 +11,17 @@ import '../test/catalog_api_test.dart' as catalog;
 import '../test/collection_controller_test.dart' as collection;
 import '../test/wave_buffer_test.dart' as wave;
 
+import '../test/lyrics_test.dart' as lyrics;
+import '../test/personal_api_test.dart' as personal;
+import '../test/personal_store_test.dart' as personal_store;
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   group('Android SQLite ratings', ratings.main);
   group('Queue', queue.main);
+  group('Lyrics', lyrics.main);
+  group('Personal API', personal.main);
+  group('Personal store', personal_store.main);
   group('Catalog', catalog.main);
   group('Collection edits', collection.main);
   group('Wave buffer', wave.main);
