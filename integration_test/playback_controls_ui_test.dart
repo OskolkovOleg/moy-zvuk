@@ -17,7 +17,7 @@ import 'package:zvuk_personal/ui/queue_view.dart';
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   testWidgets(
-    'Editable queue, timer, repeat and safe final wave preview at narrow widths',
+    'Editable queue, timer and repeat in the compact player at narrow widths',
     (tester) async {
       final dir = await Directory.systemTemp.createTemp('zvuk-controls-ui');
       final store = await LibraryStore.open(
@@ -129,6 +129,9 @@ void main() {
         await tester.pumpAndSettle();
         expect(music.playlist.hasNext, false);
         expect(music.repeatMode, AudioServiceRepeatMode.none);
+        // Let the queue-clear confirmation expire before testing player buttons.
+        await tester.pump(const Duration(seconds: 5));
+        await tester.pumpAndSettle();
         music.isWave = true;
         music.revision.value++;
         await tester.tap(find.byTooltip('Плеер'));
