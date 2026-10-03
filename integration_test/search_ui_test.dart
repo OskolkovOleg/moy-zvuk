@@ -17,6 +17,7 @@ import 'package:zvuk_personal/playback/music_handler.dart';
 import 'package:zvuk_personal/playback/service_config.dart';
 import 'package:zvuk_personal/ui/app.dart';
 import 'package:zvuk_personal/ui/search_screen.dart';
+import 'package:zvuk_personal/ui/player_sheet.dart';
 
 import 'background_controls_test.dart' show silence;
 import 'radio_playback_test.dart' show RadioFixtureApi;
@@ -146,6 +147,16 @@ void main() {
         await tester.pump();
       }
 
+      Future<void> type(String value) async {
+        // Integration binding retains focusedEditable after explicit unfocus.
+        // Reopen the input connection as a user tap would before injecting text.
+        await tap(field());
+        await tester.pumpAndSettle();
+        binding.focusedEditable = null;
+        await tester.enterText(field(), value);
+        expect(tester.widget<TextField>(field()).controller!.text, value);
+      }
+
       Future<void> settleSearch() async {
         await tester.pump(const Duration(milliseconds: 450));
         await tester.pumpAndSettle();
@@ -169,7 +180,7 @@ void main() {
         await binding.convertFlutterSurfaceToImage();
         await tester.pump();
         await binding.takeScreenshot('v180-01-history');
-        await tester.enterText(field(), 'ночь');
+        await type('ночь');
         await settleSearch();
         expect(queries.last, 'ночь');
         expect(find.text('Ночная дорога'), findsOneWidget);
@@ -222,8 +233,16 @@ void main() {
           true,
         );
         failSearch = true;
-        await tester.enterText(field(), 'ошибка');
+        await type('ошибка');
         await settleSearch();
+        expect(
+          MediaQuery.viewInsetsOf(tester.element(field())).bottom,
+          greaterThan(0),
+        );
+        expect(find.byType(MiniPlayer), findsNothing);
+        await binding.takeScreenshot('v180-07-keyboard-large');
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pumpAndSettle();
         await binding.takeScreenshot('v180-04-error-large');
         expect(queries.last, 'ошибка');
         expect(find.text('Повторить'), findsOneWidget);
@@ -232,13 +251,15 @@ void main() {
         await tap(find.text('Повторить'));
         await settleSearch();
         expect(find.text('Повторить'), findsNothing);
-        await tester.enterText(field(), 'пусто');
+        await type('пусто');
         await settleSearch();
         expect(find.text('Ничего не нашлось'), findsOneWidget);
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pumpAndSettle();
         await binding.takeScreenshot('v180-05-empty-large');
         await clear();
         hold = Completer<void>();
-        await tester.enterText(field(), 'старый аккаунт');
+        await type('старый аккаунт');
         await tester.pump(const Duration(milliseconds: 450));
         expect(queries.last, 'старый аккаунт');
         app.account = const Account('other', 'Другой');

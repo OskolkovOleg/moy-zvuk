@@ -131,7 +131,8 @@ class _ZvukAppState extends State<ZvukApp> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
-                MiniPlayer(app),
+                if (MediaQuery.viewInsetsOf(context).bottom == 0)
+                  MiniPlayer(app),
               ],
             ),
           ),
