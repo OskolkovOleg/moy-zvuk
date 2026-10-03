@@ -80,6 +80,10 @@ void main() {
               !music.loading,
         );
         expect(music.isWave, true);
+        expect(
+          music.playbackState.value.systemActions,
+          contains(MediaAction.setRepeatMode),
+        );
         expect(calls, greaterThanOrEqualTo(3));
         expect(music.error.value, isNull);
         await music.pause();

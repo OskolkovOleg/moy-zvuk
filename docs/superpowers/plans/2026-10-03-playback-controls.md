@@ -15,9 +15,9 @@ Version 1.6.0+9; preserve credentials, ratings, library order and queue; no pack
 
 Files: lib/playback/playback_queue.dart, sleep_timer.dart; test/playback_queue_test.dart, sleep_timer_test.dart.
 Interfaces: entryKey(index), version, move(from,to), remove(index), clearUpcoming(), shuffleUpcoming(); SleepTimerState.schedule(duration,now), afterSong(), cancel(), expire(now), finishSong(), remaining(now).
-- [ ] Tests for current occurrence identity across moves/removal, duplicates, empty/end boundaries and restore.
-- [ ] Implement keys unique within queue instance and revision on index/content changes; cache serialization stays backward-compatible.
-- [ ] Pure timer tests: exact deadline, replacement/cancellation, after-song mutually exclusive with timed mode.
+- [x] Tests for current occurrence identity across moves/removal, duplicates, empty/end boundaries and restore.
+- [x] Implement keys unique within queue instance and revision on index/content changes; cache serialization stays backward-compatible.
+- [x] Pure timer tests: exact deadline, replacement/cancellation, after-song mutually exclusive with timed mode.
 
 ```dart
 final q = PlaybackQueue()..replace([a, b, a], 2);
@@ -30,12 +30,12 @@ expect(q.current, a);
 
 ### Task 2: Playback behavior
 
-Files: lib/playback/music_handler.dart, playback_controls.dart; integration_test/playback_controls_test.dart.
+Files: lib/playback/music_handler.dart, queue_controls.dart; integration_test/playback_controls_test.dart.
 Interfaces: MusicHandler.removeFromQueue(index,version), moveInQueue(from,to,version), moveNextInQueue(index,version), shuffleUpcoming(), clearUpcoming(), setRepeatMode(mode), setSleepTimer(duration), sleepAfterSong(), cancelSleepTimer(); nextTrack/upNextLabel for bounds-safe preview.
-- [ ] Preserve current audio for non-current edits; stale versions return false. Current removal loads next only if previously playing; paused/empty cases do not start playback.
-- [ ] Repeat natural completion and media commands, persist mode, clear when starting wave. Preview handles empty next wave batch.
-- [ ] Timer state owned by handler, periodic deadline check cancels pending play through pause; end-song branch precedes repeat/wave.
-- [ ] Local WAV tests for natural loop, manual next, paused removal, no interruption on reorder, timer in background and delayed load; wave clearing rejects late fetch.
+- [x] Preserve current audio for non-current edits; stale versions return false. Current removal loads next only if previously playing; paused/empty cases do not start playback.
+- [x] Repeat natural completion and media commands, persist mode, clear when starting wave. Preview handles empty next wave batch.
+- [x] Timer state owned by handler, periodic deadline check cancels pending play through pause; end-song branch precedes repeat/wave.
+- [x] Local WAV tests for natural loop, manual next, paused removal, no interruption on reorder, timer in background and delayed load; wave clearing rejects late fetch.
 
 ```dart
 await music.setRepeatMode(AudioServiceRepeatMode.one);
@@ -48,15 +48,15 @@ expect(music.playlist.current!.id, second.id);
 ### Task 3: Interface
 
 Files: lib/ui/queue_view.dart, playback_controls.dart, player_sheet.dart; integration_test/playback_controls_ui_test.dart.
-- [ ] Move queue UI out of player_sheet.dart; ReorderableListView keys use occurrence key, drag/drop snapshot version rejects stale edits.
-- [ ] Per-row menu next/remove; toolbar shuffle remaining and clear remaining; labels explain local queue effect.
-- [ ] Player repeat and sleep buttons, timer picker and countdown; safe next preview for repeat and empty wave continuation.
-- [ ] Fixture UI interactions and screenshots at 360dp and 1.6x scale; no real private data in screenshots.
+- [x] Move queue UI out of player_sheet.dart; ReorderableListView keys use occurrence key, drag/drop snapshot version rejects stale edits.
+- [x] Per-row menu next/remove; toolbar shuffle remaining and clear remaining; labels explain local queue effect.
+- [x] Player repeat and sleep buttons, timer picker and countdown; safe next preview for repeat and empty wave continuation.
+- [x] Fixture UI interactions and screenshots at 360dp and 1.6x scale; no real private data in screenshots.
 
 ### Task 4: Release
 
 Files: pubspec.yaml, settings_screen.dart, README.md, docs/verification.md; integration_test/core_test.dart.
-- [ ] Core tests, new playback/UI integration and background regression; formatter and analyzer.
+- [x] Core tests, new playback/UI integration and background regression; formatter and analyzer.
 - [ ] Build 1.6.0 signed release; resource/signature/secret checks, upgrade fixture preserves data.
 - [ ] Commit and push; CI passes; publish APK, mirror code and preserve private verification history.
 - [ ] Install on physical phone only if it appears; otherwise report ready APK and USB limitation.

@@ -7,6 +7,8 @@ import '../app_controller.dart';
 import '../playback/music_handler.dart';
 import 'widgets.dart';
 import 'lyrics_screen.dart';
+import 'queue_view.dart';
+import 'playback_controls.dart';
 
 void openPlayer(BuildContext context, AppController app) =>
     Navigator.of(context).push(
@@ -419,7 +421,8 @@ class _PlayerSheetState extends State<PlayerSheet> {
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 20),
+                                const SizedBox(height: 12),
+                                Center(child: PlaybackControls(music)),
                                 Center(
                                   child: TextButton.icon(
                                     onPressed: () =>
@@ -541,7 +544,11 @@ class _PlayerSheetState extends State<PlayerSheet> {
                                                 CrossAxisAlignment.start,
                                             children: [
                                               Text(
-                                                music.canSkipNext
+                                                music.repeatMode ==
+                                                        AudioServiceRepeatMode
+                                                            .one
+                                                    ? 'На повторе'
+                                                    : music.canSkipNext
                                                     ? 'Далее'
                                                     : 'Последняя песня',
                                                 style: TextStyle(
@@ -552,15 +559,7 @@ class _PlayerSheetState extends State<PlayerSheet> {
                                               ),
                                               const SizedBox(height: 3),
                                               Text(
-                                                music.canSkipNext
-                                                    ? music
-                                                          .playlist
-                                                          .tracks[music
-                                                                  .playlist
-                                                                  .index +
-                                                              1]
-                                                          .title
-                                                    : 'Очередь завершится без повтора',
+                                                music.upNextTitle,
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: const TextStyle(
@@ -601,110 +600,4 @@ class _PlayerSheetState extends State<PlayerSheet> {
       );
     },
   );
-}
-
-class QueueView extends StatefulWidget {
-  const QueueView(this.app, {super.key});
-  final AppController app;
-  @override
-  State<QueueView> createState() => _QueueViewState();
-}
-
-class _QueueViewState extends State<QueueView> {
-  late final ScrollController scroll;
-  @override
-  void initState() {
-    super.initState();
-    scroll = ScrollController(
-      initialScrollOffset: (widget.app.music.playlist.index * 76.0 - 76).clamp(
-        0,
-        double.infinity,
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    scroll.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final music = widget.app.music, queue = music.playlist;
-    final scheme = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 10, 24, 14),
-          child: Text(
-            '${queue.tracks.length} треков · ${music.isShuffled ? "случайный порядок" : "сверху вниз"}',
-            style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
-          ),
-        ),
-        Expanded(
-          child: ListView.builder(
-            key: ValueKey('queue:${queue.tracks.length}'),
-            controller: scroll,
-            itemCount: queue.tracks.length,
-            itemBuilder: (context, index) {
-              final track = queue.tracks[index], current = index == queue.index;
-              return Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 2,
-                ),
-                child: Material(
-                  color: current
-                      ? scheme.primary.withValues(alpha: .09)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(14),
-                  clipBehavior: Clip.antiAlias,
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 4,
-                    ),
-                    leading: Artwork(track, size: 48),
-                    title: Text(
-                      track.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: current ? scheme.primary : null,
-                      ),
-                    ),
-                    subtitle: Text(
-                      current
-                          ? 'Сейчас играет · ${track.artists}'
-                          : track.artists,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                    trailing: current
-                        ? Icon(Icons.graphic_eq_rounded, color: scheme.primary)
-                        : Text(
-                            '${index + 1}',
-                            style: TextStyle(
-                              color: scheme.onSurfaceVariant,
-                              fontSize: 12,
-                            ),
-                          ),
-                    onTap: () => music.skipToQueueItem(index),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
 }

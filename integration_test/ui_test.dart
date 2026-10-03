@@ -14,6 +14,7 @@ import 'package:zvuk_personal/data/zvuk_api.dart';
 import 'package:zvuk_personal/playback/music_handler.dart';
 import 'package:zvuk_personal/ui/app.dart';
 import 'package:zvuk_personal/ui/player_sheet.dart';
+import 'package:zvuk_personal/ui/queue_view.dart';
 import 'package:zvuk_personal/ui/settings_screen.dart';
 
 import '../test/widget_test.dart' as widgets;

@@ -11,6 +11,9 @@ import '../data/models.dart';
 import '../data/zvuk_api.dart';
 import 'playback_queue.dart';
 import 'wave_buffer.dart';
+import 'sleep_timer.dart';
+
+part 'queue_controls.dart';
 
 class MusicHandler extends BaseAudioHandler with SeekHandler {
   MusicHandler(this.store) {
@@ -28,6 +31,11 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
       _recordListening();
       _maybeAdvance();
     });
+    _sleepTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!sleepTimer.active) return;
+      if (sleepTimer.expire(DateTime.now())) unawaited(pause());
+      revision.value++;
+    });
     _timer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (player.playing) unawaited(_saveSafely());
     });
@@ -39,13 +47,37 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
   final revision = ValueNotifier<int>(0);
   String sourceTitle = 'Очередь';
   bool isShuffled = false, isWave = false;
+  AudioServiceRepeatMode repeatMode = AudioServiceRepeatMode.none;
+  final sleepTimer = SleepTimerState();
+  bool _startingWave = false;
   final _wave = WaveBuffer();
   int _waveGeneration = 0;
   Future<void>? _fillingWave;
   bool _waitingNext = false;
-  bool get canSkipNext => playlist.hasNext || isWave;
+  bool get canSkipNext =>
+      playlist.hasNext ||
+      isWave ||
+      (repeatMode == AudioServiceRepeatMode.all && playlist.current != null);
+  Track? get nextTrack {
+    if (repeatMode == AudioServiceRepeatMode.one) return playlist.current;
+    if (playlist.hasNext) return playlist.tracks[playlist.index + 1];
+    if (repeatMode == AudioServiceRepeatMode.all &&
+        !isWave &&
+        playlist.current != null) {
+      return playlist.tracks.first;
+    }
+    return null;
+  }
+
+  String get upNextTitle =>
+      nextTrack?.title ??
+      (isWave ? 'Поток подберёт следующую' : 'Очередь завершится без повтора');
 
   void _cancelWave() {
+    if (_startingWave) {
+      _startingWave = false;
+      _loading = false;
+    }
     _waveGeneration++;
     _wave.cancel();
     _fillingWave = null;
@@ -61,6 +93,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     final api = _api;
     if (api == null) return;
     _loading = true;
+    _startingWave = true;
     error.value = null;
     _broadcast();
     try {
@@ -74,6 +107,8 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
         );
       }
       isWave = true;
+      _startingWave = false;
+      repeatMode = AudioServiceRepeatMode.none;
       isShuffled = false;
       sourceTitle = 'Мой поток';
       playlist.replace(tracks, 0);
@@ -81,13 +116,16 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
       _publishQueue();
       await _loadAndPlay();
     } catch (e) {
-      if (generation == _generation) {
+      if (generation == _generation && waveGeneration == _waveGeneration) {
+        _startingWave = false;
         _loading = false;
         error.value = e is ZvukException
             ? e.message
             : 'Поток не загрузился. Попробуй снова.';
         _broadcast();
       }
+    } finally {
+      if (waveGeneration == _waveGeneration) _startingWave = false;
     }
   }
 
@@ -131,7 +169,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     }
   }
 
-  late final Timer _timer;
+  late final Timer _timer, _sleepTicker;
   ZvukApi? _api;
   String? _account;
   bool _loaded = false, _loading = false, _advancing = false;
@@ -190,6 +228,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
       return;
     }
     ++_generation;
+    sleepTimer.cancel();
     await pause();
     _cancelWave();
     await player.stop();
@@ -200,6 +239,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     playlist.replace([], 0);
     sourceTitle = 'Очередь';
     isShuffled = false;
+    repeatMode = AudioServiceRepeatMode.none;
     _restoredPosition = Duration.zero;
     final saved = await store.get(account, 'queue');
     if (saved is Map<String, dynamic>) {
@@ -208,6 +248,11 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
         sourceTitle = saved['title'] as String? ?? 'Очередь';
         isShuffled = saved['shuffled'] == true;
         isWave = saved['wave'] == true;
+        repeatMode = switch (saved['repeat']) {
+          'one' => AudioServiceRepeatMode.one,
+          'all' when !isWave => AudioServiceRepeatMode.all,
+          _ => AudioServiceRepeatMode.none,
+        };
         _restoredPosition = Duration(
           milliseconds: saved['position'] as int? ?? 0,
         );
@@ -255,7 +300,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
           MediaControl.skipToNext,
           MediaControl.stop,
         ],
-        systemActions: const {MediaAction.seek},
+        systemActions: const {MediaAction.seek, MediaAction.setRepeatMode},
         androidCompactActionIndices: const [0, 1, 2],
         processingState: _loading
             ? AudioProcessingState.loading
@@ -270,6 +315,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
         updatePosition: _loaded ? player.position : _restoredPosition,
         bufferedPosition: player.bufferedPosition,
         speed: player.speed,
+        repeatMode: repeatMode,
         queueIndex: playlist.current == null ? null : playlist.index,
       ),
     );
@@ -283,6 +329,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
         'title': sourceTitle,
         'shuffled': isShuffled,
         'wave': isWave,
+        'repeat': repeatMode.name,
         'position':
             (_loaded ? player.position : _restoredPosition).inMilliseconds,
       });
@@ -320,13 +367,13 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     await _saveSafely();
   }
 
-  Future<void> _loadAndPlay() {
+  Future<void> _loadAndPlay({bool autoplay = true}) {
     final generation = ++_generation;
     final track = playlist.current;
     final api = _api;
     _loaded = false;
     _historyRecorded = false;
-    _loading = track != null;
+    _loading = track != null && autoplay;
     error.value = null;
     // Stop promptly, then serialize source loading so an older HTTP request
     // can never replace the newest selected song.
@@ -335,7 +382,15 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     _broadcast();
     final position = _restoredPosition;
     _pending = _pending.catchError((_) {}).then((_) async {
-      if (generation != _generation || track == null) return;
+      if (generation != _generation) return;
+      if (track == null || !autoplay) {
+        await player.stop();
+        if (generation == _generation) {
+          _broadcast();
+          await _saveSafely();
+        }
+        return;
+      }
       try {
         if (api == null) {
           throw const ZvukException(
@@ -381,7 +436,10 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
       return;
     }
     if (player.processingState == ProcessingState.completed) {
+      final generation = _generation;
+      _historyRecorded = false;
       await player.seek(Duration.zero);
+      if (generation != _generation) return;
     }
     error.value = null;
     unawaited(
@@ -405,6 +463,8 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
 
   @override
   Future<void> stop() async {
+    sleepTimer.cancel();
+    revision.value++;
     ++_generation;
     final resumePosition = position;
     await pause();
@@ -459,8 +519,14 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
       }
     }
     if (!playlist.advance()) {
-      await pause();
-      return;
+      if (repeatMode == AudioServiceRepeatMode.all &&
+          !isWave &&
+          playlist.current != null) {
+        playlist.jump(0);
+      } else {
+        await pause();
+        return;
+      }
     }
     _restoredPosition = Duration.zero;
     _publishQueue(updateQueue: false);
@@ -469,11 +535,18 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
 
   @override
   Future<void> skipToPrevious() async {
-    if (player.position.inSeconds > 3) {
+    if (position.inSeconds > 3) {
       await seek(Duration.zero);
       return;
     }
-    if (playlist.previous()) {
+    final moved = playlist.previous();
+    final wrap =
+        !moved &&
+        repeatMode == AudioServiceRepeatMode.all &&
+        !isWave &&
+        playlist.current != null;
+    if (wrap) playlist.jump(playlist.length - 1);
+    if (moved || wrap) {
       _restoredPosition = Duration.zero;
       _publishQueue(updateQueue: false);
       await _loadAndPlay();
@@ -484,16 +557,35 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
 
   @override
   Future<void> skipToQueueItem(int index) async {
+    if (index < 0 || index >= playlist.length) return;
     playlist.jump(index);
     _restoredPosition = Duration.zero;
     _publishQueue(updateQueue: false);
     await _loadAndPlay();
   }
 
+  @override
+  Future<void> setRepeatMode(AudioServiceRepeatMode repeatMode) async {
+    final normalized = repeatMode == AudioServiceRepeatMode.group
+        ? AudioServiceRepeatMode.all
+        : repeatMode;
+    this.repeatMode = isWave && normalized == AudioServiceRepeatMode.all
+        ? AudioServiceRepeatMode.none
+        : normalized;
+    revision.value++;
+    _broadcast();
+    await _saveSafely();
+  }
+
   Future<void> _complete() async {
     _advancing = true;
     try {
-      if (canSkipNext) {
+      if (sleepTimer.finishSong() || sleepTimer.expire(DateTime.now())) {
+        revision.value++;
+        await pause();
+      } else if (repeatMode == AudioServiceRepeatMode.one) {
+        await play();
+      } else if (canSkipNext) {
         await skipToNext();
       } else {
         await pause();
@@ -505,6 +597,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
 
   Future<void> disposeHandler() async {
     _timer.cancel();
+    _sleepTicker.cancel();
     await stop();
     _cancelWave();
     await player.dispose();
