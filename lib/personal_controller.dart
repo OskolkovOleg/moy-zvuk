@@ -7,7 +7,12 @@ extension PersonalCollection on AppController {
 
   Future<void> refreshSavedCatalog() async {
     final session = api, id = account?.id;
-    if (session == null || id == null || serverBusy) return;
+    if (id == null || serverBusy) return;
+    if (session == null) {
+      savedCatalogError = 'Обнови подключение в настройках.';
+      _notifySavedCatalog();
+      return;
+    }
     final request = ++_savedRequest, revision = _catalogRevision;
     savedCatalogLoading = true;
     savedCatalogError = null;
