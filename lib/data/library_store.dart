@@ -70,7 +70,7 @@ class LibraryStore {
     return {
       for (final row in rows)
         row['track'] as String: Rating(
-          row['score'] as int,
+          initialTrackScore + (row['score'] as int),
           row['count'] as int,
         ),
     };

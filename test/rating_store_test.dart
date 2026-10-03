@@ -28,24 +28,55 @@ void main() {
     await store.vote('a', a, 1);
     await store.vote('a', a, 1);
     final minus = await store.vote('a', a, -1);
-    expect((await store.ratings('a'))['1']!.score, 1);
+    expect((await store.ratings('a'))['1']!.score, 11);
     await store.undo('other', minus);
-    expect((await store.ratings('a'))['1']!.score, 1);
+    expect((await store.ratings('a'))['1']!.score, 11);
     await store.undo('a', minus);
-    expect((await store.ratings('a'))['1']!.score, 2);
+    expect((await store.ratings('a'))['1']!.score, 12);
     await store.saveTracks('a', 'favorites', [b, a]);
     await store.close();
     store = await LibraryStore.open(
       factory: Platform.isAndroid ? native.databaseFactory : databaseFactoryFfi,
       databasePath: '${directory.path}/test.db',
     );
-    expect((await store.ratings('a'))['1']!.score, 2);
+    expect((await store.ratings('a'))['1']!.score, 12);
     expect(await store.ratings('other'), isEmpty);
     expect((await store.loadTracks('a', 'favorites')).map((t) => t.id), [
       '2',
       '1',
     ]);
   });
+  test(
+    'Legacy backups keep vote history and apply the baseline only once',
+    () async {
+      final legacy = jsonEncode({
+        'version': 1,
+        'account': 'a',
+        'events': [
+          {
+            'id': 'legacy-minus',
+            'track': a.id,
+            'delta': -1,
+            'created': '2026-10-02T10:00:00Z',
+            'undone': false,
+            'metadata': a.toJson(),
+          },
+        ],
+      });
+      expect(await store.importRatings('a', legacy), 1);
+      expect(trackScore(a.id, await store.ratings('a')), 9);
+      expect(await store.importRatings('a', legacy), 0);
+      final exported = jsonDecode(await store.exportRatings('a'));
+      expect(exported['events'], hasLength(1));
+      expect(exported['events'][0]['delta'], -1);
+      expect(trackScore(a.id, await store.ratings('a')), 9);
+      await store.undo('a', 'legacy-minus');
+      expect(trackScore(a.id, await store.ratings('a')), 10);
+      await store.importRatings('a', legacy);
+      expect(trackScore(a.id, await store.ratings('a')), 10);
+      expect(trackScore('new-song', await store.ratings('a')), 10);
+    },
+  );
   test(
     'Repeated import does not duplicate, undo survives old backup',
     () async {
@@ -55,6 +86,7 @@ void main() {
       expect(await store.importRatings('a', backup), 0);
       expect(await store.importRatings('a', backup), 0);
       expect(await store.ratings('a'), isEmpty);
+      expect(trackScore(a.id, await store.ratings('a')), 10);
       await expectLater(
         store.importRatings('b', backup),
         throwsFormatException,
@@ -75,7 +107,7 @@ void main() {
         store.importRatings('a', jsonEncode(data)),
         throwsFormatException,
       );
-      expect((await store.ratings('a'))['1']!.score, 1);
+      expect((await store.ratings('a'))['1']!.score, 11);
       data['events'] = [
         {...old, 'delta': 100},
       ];
@@ -85,24 +117,31 @@ void main() {
       );
     },
   );
-  test(
-    'Zero after votes differs from unrated and ties preserve order',
-    () async {
-      await store.vote('a', a, 1);
-      await store.vote('a', a, -1);
-      final ratings = await store.ratings('a');
-      expect(rankedTracks([b, a], ratings).map((t) => t.id), ['2', '1']);
-      expect(rankedTracks([b, a], ratings, unrated: true).map((t) => t.id), [
-        '2',
-      ]);
-      await store.vote('a', a, 1);
-      expect(rankedTracks([b, a], await store.ratings('a')).first.id, '1');
-    },
-  );
-  test('Scores can go below zero; undo is idempotent', () async {
+  test('Baseline after balanced votes differs from unrated and ties preserve order', () async {
+    await store.vote('a', a, 1);
     await store.vote('a', a, -1);
+    final ratings = await store.ratings('a');
+    expect(rankedTracks([b, a], ratings).map((t) => t.id), ['2', '1']);
+    expect(rankedTracks([b, a], ratings, unrated: true).map((t) => t.id), [
+      '2',
+    ]);
+    await store.vote('a', a, 1);
+    expect(rankedTracks([b, a], await store.ratings('a')).first.id, '1');
+  });
+  test('Scores can go below zero; undo is idempotent', () async {
+    for (var i = 0; i < 11; i++) {
+      await store.vote('a', a, -1);
+    }
+    await store.saveTracks('a', 'favorites', [a, b]);
     final last = await store.vote('a', a, -1);
     expect((await store.ratings('a'))['1']!.score, -2);
+    expect(
+      rankedTracks(
+        await store.loadTracks('a', 'favorites'),
+        await store.ratings('a'),
+      ).map((t) => t.id),
+      ['2', '1'],
+    );
     await store.undo('a', last);
     await store.undo('a', last);
     expect((await store.ratings('a'))['1']!.score, -1);
@@ -143,7 +182,7 @@ void main() {
       expect(await store.loadOrder('a', 'favorites'), ['2', '1']);
       expect(await store.loadOrder('a', 'playlist'), ['1', '2']);
       expect(await store.loadOrder('other', 'favorites'), isEmpty);
-      expect((await store.ratings('a'))['1']!.score, 1);
+      expect((await store.ratings('a'))['1']!.score, 11);
     },
   );
 
@@ -177,7 +216,7 @@ void main() {
       store.importRatings('a', jsonEncode(backup)),
       throwsFormatException,
     );
-    expect((await store.ratings('a'))['1']!.score, 1);
+    expect((await store.ratings('a'))['1']!.score, 11);
     expect(await store.loadOrder('a', 'favorites'), isEmpty);
   });
 }

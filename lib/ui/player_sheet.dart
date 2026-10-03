@@ -20,11 +20,12 @@ class MiniPlayer extends StatelessWidget {
   final AppController app;
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: Listenable.merge([app.music.revision, app.music.error]),
+    animation: Listenable.merge([app, app.music.revision, app.music.error]),
     builder: (context, _) {
       final music = app.music, track = music.playlist.current;
       if (track == null) return const SizedBox.shrink();
       final scheme = Theme.of(context).colorScheme;
+      final rank = app.positionFor(track);
       return Container(
         margin: const EdgeInsets.fromLTRB(12, 4, 12, 6),
         decoration: BoxDecoration(
@@ -76,6 +77,23 @@ class MiniPlayer extends StatelessWidget {
                                         : scheme.error,
                                   ),
                                 ),
+                                if (rank != null) ...[
+                                  const SizedBox(height: 3),
+                                  Tooltip(
+                                    message:
+                                        '№ ${rank.position} из ${rank.total} по баллам в «${app.listTitle}»',
+                                    child: Text(
+                                      '№ ${rank.position} по баллам',
+                                      key: const Key('mini-rating-position'),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: scheme.primary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -364,6 +382,11 @@ class _PlayerSheetState extends State<PlayerSheet> {
                                   ],
                                 ),
                                 const SizedBox(height: 10),
+                                RatingPositionLabel(
+                                  position: app.positionFor(track),
+                                  listTitle: app.listTitle,
+                                ),
+                                const SizedBox(height: 8),
                                 PositionControl(
                                   music,
                                   key: ValueKey(
@@ -416,8 +439,7 @@ class _PlayerSheetState extends State<PlayerSheet> {
                                         ),
                                       ),
                                       RatingControls(
-                                        score:
-                                            app.ratings[track.id]?.score ?? 0,
+                                        score: app.scoreFor(track),
                                         title: track.title,
                                         onVote: (delta) => voteWithUndo(
                                           context,
@@ -446,7 +468,7 @@ class _PlayerSheetState extends State<PlayerSheet> {
                                                 CrossAxisAlignment.start,
                                             children: [
                                               Text(
-                                                'Место ${index + 1}',
+                                                'Вручную: № ${index + 1}',
                                                 style: const TextStyle(
                                                   fontSize: 14,
                                                   fontWeight: FontWeight.w600,

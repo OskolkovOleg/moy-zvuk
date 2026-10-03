@@ -5,6 +5,7 @@ import '../test/rating_store_test.dart' as ratings;
 import '../test/playback_queue_test.dart' as queue;
 import '../test/zvuk_api_test.dart' as api;
 import '../test/shuffle_test.dart' as shuffle;
+import '../test/rating_position_test.dart' as positions;
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -12,4 +13,5 @@ void main() {
   group('Queue', queue.main);
   group('API', api.main);
   group('Shuffle', shuffle.main);
+  group('Rating positions', positions.main);
 }

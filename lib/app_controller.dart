@@ -26,6 +26,13 @@ class AppController extends ChangeNotifier {
   String? message;
   int _selection = 0;
 
+  int scoreFor(Track track) => trackScore(track.id, ratings);
+
+  // Rank in the entire selected library list, independent of playback order,
+  // shuffle subset, manual arrangement and the unrated filter.
+  RatingPosition? positionFor(Track track) =>
+      ratingPosition(tracks, ratings, track.id);
+
   List<Track> get visibleTracks => ranked
       ? rankedTracks(tracks, ratings, unrated: unrated)
       : manuallyOrderedTracks(tracks, manualOrder);
@@ -246,6 +253,9 @@ class AppController extends ChangeNotifier {
     final event = await store.vote(id, track, delta);
     if (account?.id == id) {
       ratings = await store.ratings(id);
+      // Keep the song visible after its first vote rather than hiding it in
+      // the unrated-only view. Votes never alter library membership or queue.
+      unrated = false;
       notifyListeners();
     }
     return event;

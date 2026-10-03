@@ -10,7 +10,7 @@ void main() {
       c = Track(id: 'c', title: 'C');
   test('Top N is selected by descending score before randomization', () {
     final source = [a, b, c];
-    final ratings = {'a': const Rating(-3, 3), 'c': const Rating(8, 8)};
+    final ratings = {'a': const Rating(7, 3), 'c': const Rating(18, 8)};
     for (var seed = 0; seed < 12; seed++) {
       final result = shuffledTracks(
         source,

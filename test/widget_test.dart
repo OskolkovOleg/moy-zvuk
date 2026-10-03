@@ -108,7 +108,7 @@ void main() {
     await tester.pump();
     await tester.tap(find.byTooltip('Минус один: Песня'));
     await tester.pump();
-    expect(find.text('+1'), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
     expect(score, 1);
     expect(tester.takeException(), isNull);
     final size = tester.getSize(find.byTooltip('Плюс один: Песня'));

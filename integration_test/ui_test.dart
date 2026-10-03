@@ -95,14 +95,14 @@ void main() {
         app.visibleTracks.map((t) => t.id),
       );
       restored.dispose();
-      expect((await store.ratings('ui-test'))[playable[0].id]!.score, 1);
+      expect((await store.ratings('ui-test'))[playable[0].id]!.score, 11);
       await Future<void>.delayed(const Duration(seconds: 3));
       await tester.pumpAndSettle();
       await binding.takeScreenshot('v120-02-library');
       await tester.tap(find.text('По баллам'));
       await tester.pumpAndSettle();
       expect(app.visibleTracks.first.id, playable[0].id);
-      expect(find.text('+1'), findsWidgets);
+      expect(find.text('11'), findsWidgets);
       await binding.takeScreenshot('v120-03-ratings');
       await tester.tap(find.text('Мой порядок'));
       await tester.pumpAndSettle();
@@ -180,8 +180,8 @@ void main() {
       // Isolate shuffle candidates from the live catalogue in a test-only list.
       app.tracks = playable;
       app.ratings = {
-        playable[0].id: const Rating(8, 8),
-        playable[1].id: const Rating(3, 3),
+        playable[0].id: const Rating(18, 8),
+        playable[1].id: const Rating(13, 3),
       };
       final manualBefore = List<String>.of(app.manualOrder);
       await app.setSort(false);

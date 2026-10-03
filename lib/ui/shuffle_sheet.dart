@@ -50,7 +50,7 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
     final scheme = Theme.of(context).colorScheme;
     final ranked = rankedTracks(widget.tracks, widget.ratings);
     final cutoff = count > 0
-        ? widget.ratings[ranked[count - 1].id]?.score ?? 0
+        ? trackScore(ranked[count - 1].id, widget.ratings)
         : 0;
     return SafeArea(
       child: SingleChildScrollView(
@@ -114,12 +114,12 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
                     : null,
               ),
               Text(
-                '$count из $total · от ${scoreLabel(cutoff)} баллов',
+                '$count из $total · от $cutoff баллов',
                 style: TextStyle(color: scheme.onSurfaceVariant),
               ),
               const SizedBox(height: 12),
               const Text(
-                'Сначала выберем песни с наибольшими баллами, затем перемешаем их. У песен без оценок — 0 баллов.',
+                'Сначала выберем песни с наибольшими баллами, затем перемешаем их. У песен без оценок — 10 баллов.',
               ),
             ] else
               Text(

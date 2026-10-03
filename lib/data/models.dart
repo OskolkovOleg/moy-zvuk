@@ -73,6 +73,27 @@ class Rating {
   final int score, count;
 }
 
+// A fixed baseline, not a vote: reopening or importing must never add it again.
+const initialTrackScore = 10;
+
+int trackScore(String id, Map<String, Rating> ratings) =>
+    ratings[id]?.score ?? initialTrackScore;
+
+class RatingPosition {
+  const RatingPosition(this.position, this.total);
+  final int position, total;
+}
+
+RatingPosition? ratingPosition(
+  List<Track> tracks,
+  Map<String, Rating> ratings,
+  String trackId,
+) {
+  final sorted = rankedTracks(tracks, ratings);
+  final index = sorted.indexWhere((track) => track.id == trackId);
+  return index < 0 ? null : RatingPosition(index + 1, sorted.length);
+}
+
 /// Keep saved positions, drop missing entries and append new songs in source
 /// order. Consume each occurrence once: playlists may contain duplicates.
 List<Track> manuallyOrderedTracks(List<Track> source, List<String> order) {
@@ -111,9 +132,10 @@ List<Track> rankedTracks(
       .toList();
   if (ranked) {
     indexed.sort((a, b) {
-      final score = (ratings[b.value.id]?.score ?? 0).compareTo(
-        ratings[a.value.id]?.score ?? 0,
-      );
+      final score = trackScore(
+        b.value.id,
+        ratings,
+      ).compareTo(trackScore(a.value.id, ratings));
       return score != 0 ? score : a.key.compareTo(b.key);
     });
   }

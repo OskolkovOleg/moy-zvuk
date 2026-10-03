@@ -54,14 +54,18 @@ class RatingControls extends StatelessWidget {
     required this.score,
     required this.onVote,
     this.title = 'трек',
+    this.compact = false,
   });
   final int score;
   final ValueChanged<int> onVote;
   final String title;
+  final bool compact;
   @override
   Widget build(BuildContext context) => DecoratedBox(
     decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+      color: compact
+          ? Colors.transparent
+          : Theme.of(context).colorScheme.surfaceContainerHigh,
       borderRadius: BorderRadius.circular(24),
     ),
     child: Row(
@@ -71,22 +75,25 @@ class RatingControls extends StatelessWidget {
           tooltip: 'Минус один: $title',
           constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
           onPressed: () => onVote(-1),
-          icon: const Icon(Icons.remove_rounded),
+          icon: Icon(Icons.remove_rounded, size: compact ? 18 : 24),
         ),
         SizedBox(
-          width: 52,
+          width: compact ? 28 : 52,
           child: Semantics(
             label: 'Счёт $score',
             child: ExcludeSemantics(
-              child: Text(
-                scoreLabel(score),
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: score > 0
-                      ? Theme.of(context).colorScheme.primary
-                      : null,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  '$score',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: compact ? 14 : 17,
+                    fontWeight: FontWeight.w700,
+                    color: score > 0
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                  ),
                 ),
               ),
             ),
@@ -96,11 +103,48 @@ class RatingControls extends StatelessWidget {
           tooltip: 'Плюс один: $title',
           constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
           onPressed: () => onVote(1),
-          icon: const Icon(Icons.add_rounded),
+          icon: Icon(Icons.add_rounded, size: compact ? 18 : 24),
         ),
       ],
     ),
   );
+}
+
+class RatingPositionLabel extends StatelessWidget {
+  const RatingPositionLabel({
+    super.key,
+    required this.position,
+    required this.listTitle,
+  });
+  final RatingPosition? position;
+  final String listTitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final rank = position;
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          rank == null
+              ? 'Нет в текущем списке'
+              : '№ ${rank.position} из ${rank.total} по баллам',
+          key: const Key('player-rating-position'),
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: scheme.primary,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          'В «$listTitle»',
+          style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+        ),
+      ],
+    );
+  }
 }
 
 class OrderControls extends StatelessWidget {
@@ -152,6 +196,7 @@ Future<void> voteWithUndo(
   int delta,
 ) async {
   final accountId = app.account!.id;
+  final wasFiltered = app.unrated;
   try {
     final event = await app.vote(track, delta);
     if (!context.mounted) return;
@@ -159,7 +204,9 @@ Future<void> voteWithUndo(
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         duration: const Duration(seconds: 5),
-        content: Text('${track.title}: ${scoreLabel(delta)}'),
+        content: Text(
+          '${track.title}: ${scoreLabel(delta)}${wasFiltered ? ' · показаны все треки' : ''}',
+        ),
         action: SnackBarAction(
           label: 'Отменить',
           onPressed: () async {
@@ -223,6 +270,47 @@ class TrackMenu extends StatelessWidget {
   );
 }
 
+Future<void> openTrackActions(
+  BuildContext context,
+  AppController app,
+  Track track,
+) async {
+  final value = await showModalBottomSheet<String>(
+    context: context,
+    showDragHandle: true,
+    builder: (sheetContext) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(title: Text(track.title), subtitle: Text(track.artists)),
+          ListTile(
+            leading: const Icon(Icons.playlist_play_rounded),
+            title: const Text('Следующим'),
+            onTap: () => Navigator.pop(sheetContext, 'next'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.playlist_add_rounded),
+            title: const Text('В конец очереди'),
+            onTap: () => Navigator.pop(sheetContext, 'last'),
+          ),
+        ],
+      ),
+    ),
+  );
+  if (value == null) return;
+  try {
+    await app.music.enqueueTrack(track, next: value == 'next');
+    if (context.mounted) {
+      notify(
+        context,
+        value == 'next' ? 'Будет следующей' : 'Добавлено в конец очереди',
+      );
+    }
+  } catch (_) {
+    if (context.mounted) notify(context, 'Не удалось сохранить очередь.');
+  }
+}
+
 class TrackTile extends StatelessWidget {
   const TrackTile({
     super.key,
@@ -244,114 +332,98 @@ class TrackTile extends StatelessWidget {
       final scheme = Theme.of(context).colorScheme;
       final manual = orderIndex != null && !app.ranked;
       return Container(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
           color: current ? scheme.primary.withValues(alpha: .09) : null,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(12),
         ),
-        child: Column(
+        child: Row(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: onPlay,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(8, 12, 0, 12),
-                      child: Row(
+            Expanded(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: onPlay,
+                onLongPress: () => openTrackActions(context, app, track),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 4, 0, 4),
+                  child: Row(
+                    children: [
+                      Stack(
+                        alignment: Alignment.bottomRight,
                         children: [
-                          Stack(
-                            alignment: Alignment.bottomRight,
-                            children: [
-                              Artwork(track, size: 46),
-                              if (current)
-                                Container(
-                                  padding: const EdgeInsets.all(2),
-                                  decoration: BoxDecoration(
-                                    color: scheme.primary,
-                                    borderRadius: BorderRadius.circular(5),
-                                  ),
-                                  child: Icon(
-                                    Icons.graphic_eq_rounded,
-                                    size: 14,
-                                    color: scheme.onPrimary,
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  track.title,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 15,
-                                    height: 1.25,
-                                    color: current
-                                        ? scheme.primary
-                                        : scheme.onSurface,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  track.artists,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: scheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
+                          Artwork(track, size: 48),
+                          if (current)
+                            Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                color: scheme.primary,
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              child: Icon(
+                                Icons.graphic_eq_rounded,
+                                size: 14,
+                                color: scheme.onPrimary,
+                              ),
                             ),
-                          ),
                         ],
                       ),
-                    ),
-                  ),
-                ),
-                if (manual)
-                  OrderControls(
-                    title: track.title,
-                    onUp: orderIndex! > 0 && !app.reordering
-                        ? () => moveWithFeedback(context, app, orderIndex!, -1)
-                        : null,
-                    onDown: orderIndex! < orderLength! - 1 && !app.reordering
-                        ? () => moveWithFeedback(context, app, orderIndex!, 1)
-                        : null,
-                  ),
-                TrackMenu(app, track),
-              ],
-            ),
-            if (app.ranked)
-              Padding(
-                padding: const EdgeInsets.only(left: 66, right: 8, bottom: 8),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Твой счёт',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall
-                            ?.copyWith(color: scheme.onSurfaceVariant),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              track.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                                height: 1.25,
+                                color: current
+                                    ? scheme.primary
+                                    : scheme.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              track.artists,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    RatingControls(
-                      score: app.ratings[track.id]?.score ?? 0,
-                      title: track.title,
-                      onVote: (delta) =>
-                          voteWithUndo(context, app, track, delta),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
+            ),
+            if (app.ranked)
+              RatingControls(
+                compact: true,
+                score: app.scoreFor(track),
+                title: track.title,
+                onVote: (delta) => voteWithUndo(context, app, track, delta),
+              )
+            else ...[
+              if (manual)
+                OrderControls(
+                  title: track.title,
+                  onUp: orderIndex! > 0 && !app.reordering
+                      ? () => moveWithFeedback(context, app, orderIndex!, -1)
+                      : null,
+                  onDown: orderIndex! < orderLength! - 1 && !app.reordering
+                      ? () => moveWithFeedback(context, app, orderIndex!, 1)
+                      : null,
+                ),
+              TrackMenu(app, track),
+            ],
           ],
         ),
       );
