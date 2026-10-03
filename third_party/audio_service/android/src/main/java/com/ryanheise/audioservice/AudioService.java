@@ -27,8 +27,6 @@ import android.support.v4.media.session.PlaybackStateCompat;
 import android.util.LruCache;
 import android.util.Size;
 import android.view.KeyEvent;
-import android.widget.RemoteViews;
-import android.os.Parcelable;
 
 import androidx.annotation.RequiresApi;
 import androidx.core.app.ServiceCompat;
@@ -663,36 +661,23 @@ public class AudioService extends MediaBrowserServiceCompat {
         // TODO: Look at setColorized
         if (config.notificationColor != -1)
             builder.setColor(config.notificationColor);
-        RemoteViews ratingView = Build.VERSION.SDK_INT < 33 ? buildRatingContent(false) : null;
+        // Preserve the system media card, artwork palette and seek controls.
+        // A custom ordinary notification loses that presentation on Android 11.
         Integer score = currentRatingScore();
         if (score != null) {
             Bundle extras = new Bundle();
             extras.putInt("zvukRatingScore", score);
             builder.addExtras(extras);
         }
-        if (ratingView != null) {
-            // Android 11 QS reconstructs MediaStyle cards and discards custom
-            // views. A decorated ordinary notification retains this exact row;
-            // the real MediaSession remains active for headsets/lock screens.
-            Bundle extras = new Bundle();
-            extras.putParcelable(Notification.EXTRA_MEDIA_SESSION, (Parcelable)mediaSession.getSessionToken().getToken());
-            builder.addExtras(extras);
-            builder.setCategory(NotificationCompat.CATEGORY_TRANSPORT);
-            builder.setLargeIcon((Bitmap)null);
-            builder.setCustomBigContentView(ratingView);
-            builder.setCustomContentView(buildRatingContent(true));
-            builder.setStyle(new NotificationCompat.DecoratedCustomViewStyle());
-        } else {
-            for (NotificationCompat.Action action : nativeActions) builder.addAction(action);
-            final MediaStyle style = new MediaStyle().setMediaSession(mediaSession.getSessionToken());
-            if (Build.VERSION.SDK_INT < 33) style.setShowActionsInCompactView(compactActionIndices);
-            if (config.androidNotificationOngoing) {
-                style.setShowCancelButton(true);
-                style.setCancelButtonIntent(buildMediaButtonPendingIntent(PlaybackStateCompat.ACTION_STOP));
-            }
-            builder.setStyle(style);
+        for (NotificationCompat.Action action : nativeActions) builder.addAction(action);
+        final MediaStyle style = new MediaStyle().setMediaSession(mediaSession.getSessionToken());
+        if (Build.VERSION.SDK_INT < 33) style.setShowActionsInCompactView(compactActionIndices);
+        if (config.androidNotificationOngoing) {
+            style.setShowCancelButton(true);
+            style.setCancelButtonIntent(buildMediaButtonPendingIntent(PlaybackStateCompat.ACTION_STOP));
+            builder.setOngoing(true);
         }
-        if (config.androidNotificationOngoing) builder.setOngoing(true);
+        builder.setStyle(style);
         return builder.build();
     }
 
@@ -702,44 +687,6 @@ public class AudioService extends MediaBrowserServiceCompat {
             if (extras != null && extras.containsKey("zvukRatingScore")) return extras.getInt("zvukRatingScore");
         }
         return null;
-    }
-
-    private RemoteViews buildRatingContent(boolean compact) {
-        Integer score = currentRatingScore();
-        int layout = getResourceId(compact ? "layout/zvuk_notification_compact" : "layout/zvuk_notification_rating");
-        if (score == null || layout == 0 || mediaMetadata == null) return null;
-        MediaControl minus = null, plus = null;
-        for (MediaControl control : controls) {
-            if (control.customAction == null || control.customAction.extras == null || !control.customAction.extras.containsKey("zvukRatingScore")) continue;
-            if (control.label.equals("Минус 1 балл")) minus = control;
-            if (control.label.equals("Плюс 1 балл")) plus = control;
-        }
-        if (minus == null || plus == null) return null;
-        RemoteViews view = new RemoteViews(getPackageName(), layout);
-        view.setTextViewText(getResourceId("id/zvuk_notification_title"), mediaMetadata.getDescription().getTitle());
-        String artist = mediaMetadata.getString(MediaMetadataCompat.METADATA_KEY_ARTIST);
-        if (artist != null) {
-            int suffix = artist.lastIndexOf(" · Баллы:");
-            if (suffix >= 0) artist = artist.substring(0, suffix);
-            else if (artist.startsWith("Баллы:")) artist = "";
-        }
-        view.setTextViewText(getResourceId("id/zvuk_notification_artist"), artist);
-        int play = getResourceId("id/zvuk_notification_play");
-        view.setImageViewResource(play, getResourceId(playing ? "drawable/audio_service_pause" : "drawable/audio_service_play_arrow"));
-        view.setContentDescription(play, playing ? "Пауза" : "Слушать");
-        view.setOnClickPendingIntent(play, buildMediaButtonPendingIntent(playing ? PlaybackStateCompat.ACTION_PAUSE : PlaybackStateCompat.ACTION_PLAY));
-        view.setOnClickPendingIntent(getResourceId("id/zvuk_notification_previous"), buildMediaButtonPendingIntent(PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS));
-        view.setOnClickPendingIntent(getResourceId("id/zvuk_notification_next"), buildMediaButtonPendingIntent(PlaybackStateCompat.ACTION_SKIP_TO_NEXT));
-        view.setTextViewText(getResourceId("id/zvuk_notification_score"), score.toString());
-        view.setContentDescription(getResourceId("id/zvuk_notification_score"), "Баллы: " + score);
-        if (!compact) {
-            view.setOnClickPendingIntent(getResourceId("id/zvuk_notification_minus"), createCustomNotificationAction(minus).actionIntent);
-            view.setOnClickPendingIntent(getResourceId("id/zvuk_notification_plus"), createCustomNotificationAction(plus).actionIntent);
-        }
-        synchronized (this) {
-            if (artBitmap != null) view.setImageViewBitmap(getResourceId("id/zvuk_notification_art"), artBitmap);
-        }
-        return view;
     }
 
     private NotificationManager getNotificationManager() {

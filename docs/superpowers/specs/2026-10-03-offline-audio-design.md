@@ -33,3 +33,7 @@ Show live score after votes from both app and notification, including offline/ba
 ## Follow-up: compact notification (1.10.1)
 
 User feedback after installing 1.10.0: the expanded notification is too tall. Combine previous/play/next and minus/score/plus in one row below title/artist. Reuse all existing IDs/PendingIntents and ordinary notification style. Weighted button widths fit a 320 dp screen; preserve 48 dp row height, reduce artwork to 36 dp and allow metadata to grow for large text. Android 13+ system layout is unchanged. Verify actual visible layout and actions on API 30, then signed update and direct installation.
+
+## Follow-up: restore system media card (1.10.2)
+
+The user prefers the notification before adding a dedicated score view: the custom ordinary notification has an alien background, expands/collapses separately and loses the cover-based system presentation. Restore NotificationCompat.MediaStyle on all Android versions and retain artwork, session and existing minus/plus actions. Keep the live score only in artist/displaySubtitle metadata and action extras; remove both custom layouts and their resource keep entries. Preserve playback, download persistence and stale-action guards. Validate native style, real artwork, immediate score metadata and actual PendingIntents on API 30, offline background playback, signed update and direct installation.

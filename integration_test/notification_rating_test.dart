@@ -37,9 +37,15 @@ void main() {
       builder: () => MusicHandler(store),
       config: musicServiceConfig,
     );
-    const a = Track(
+    final cover = await rootBundle.load('assets/brand/icon.png');
+    final coverFile = File('${dir.path}/cover.png');
+    await coverFile.writeAsBytes(
+      cover.buffer.asUint8List(cover.offsetInBytes, cover.lengthInBytes),
+    );
+    final a = Track(
       id: 'rating-a',
       title: 'Ночная дорога',
+      imageUrl: coverFile.uri.toString(),
       artists: 'Тестовый артист',
       duration: 60,
     );
@@ -73,12 +79,14 @@ void main() {
         true,
       );
       final sdk = info['sdk'] as int;
-      if (sdk < 33) expect(info['hasRatingView'], true);
+      expect(info['style'], contains('MediaStyle'));
+      expect(info['hasCustomView'], false);
+      expect(info['hasArtwork'], true);
       expect((info['actions'] as List).contains('Stop'), false);
       expect(info['ratingScore'], 10);
-      if (sdk < 33) expect(info['hasRatingView'], true);
+      expect(info['subtitle'], contains('Баллы: 10'));
       Future<void> press(String label) => bridge.invokeMethod<void>(
-        sdk < 33 ? 'notificationRatingAction' : 'customMediaAction',
+        sdk < 33 ? 'notificationAction' : 'customMediaAction',
         label,
       );
 
@@ -86,7 +94,10 @@ void main() {
       await press('Плюс 1 балл');
       await clips.until(() => app.scoreFor(a) == 11);
       await Future<void>.delayed(const Duration(milliseconds: 500));
-      expect((await notification())['ratingScore'], 11);
+      final afterVote = await notification();
+      expect(afterVote['ratingScore'], 11);
+      expect(afterVote['subtitle'], contains('Баллы: 11'));
+      expect(afterVote['hasArtwork'], true);
       expect(music.player.playing, true);
       await bridge.invokeMethod<void>(
         sdk < 33 ? 'notificationTransport' : 'mediaCommand',

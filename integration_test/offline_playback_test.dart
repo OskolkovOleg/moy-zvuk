@@ -103,9 +103,7 @@ void main() {
         );
         await clips.until(() => music.player.playing);
         await bridge.invokeMethod<void>(
-          info['sdk'] as int < 33
-              ? 'notificationRatingAction'
-              : 'customMediaAction',
+          info['sdk'] as int < 33 ? 'notificationAction' : 'customMediaAction',
           'Плюс 1 балл',
         );
         await clips.until(() => app.scoreFor(songs[1]) == 11);

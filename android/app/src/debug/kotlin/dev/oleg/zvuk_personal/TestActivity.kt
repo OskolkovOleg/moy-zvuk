@@ -33,7 +33,10 @@ class TestActivity : AudioServiceActivity() {
                     "customLabels" to (state?.customActions?.map { it.name.toString() } ?: emptyList<String>()),
                     "customIcons" to (state?.customActions?.map { it.icon } ?: emptyList<Int>()),
                     "ratingScore" to notification?.extras?.getInt("zvukRatingScore"),
-                    "hasRatingView" to (notification?.bigContentView != null),
+                    "hasCustomView" to (notification?.contentView != null || notification?.bigContentView != null),
+                    "style" to notification?.extras?.getString("android.template"),
+                    "subtitle" to notification?.extras?.getCharSequence(Notification.EXTRA_TEXT)?.toString(),
+                    "hasArtwork" to (notification?.getLargeIcon() != null),
                     "sdk" to android.os.Build.VERSION.SDK_INT
                 ))
             } else if (call.method == "notificationAction" || call.method == "customMediaAction") {
@@ -60,21 +63,21 @@ class TestActivity : AudioServiceActivity() {
                         }
                     }
                 }
-            } else if (call.method == "notificationRatingAction" || call.method == "notificationTransport") {
+            } else if (call.method == "notificationTransport") {
                 val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
                 val notification = manager.activeNotifications.firstOrNull { it.notification.category == Notification.CATEGORY_TRANSPORT }?.notification
-                val views = notification?.bigContentView
-                if (views == null) result.error("NO_VIEW", "Missing rating view", null)
+                val label = when (call.arguments as String) {
+                    "previous" -> "Previous"
+                    "next" -> "Next"
+                    "pause" -> "Pause"
+                    "play" -> "Play"
+                    else -> ""
+                }
+                val action = notification?.actions?.firstOrNull { it.title.toString() == label }
+                if (action == null) result.error("NO_ACTION", "Missing transport action", null)
                 else {
-                    val parent = android.widget.FrameLayout(this)
-                    val view = views.apply(this, parent)
-                    val name = if (call.method == "notificationTransport") when (call.arguments) {
-                        "previous" -> "zvuk_notification_previous"
-                        "next" -> "zvuk_notification_next"
-                        else -> "zvuk_notification_play"
-                    } else if (call.arguments == "Плюс 1 балл") "zvuk_notification_plus" else "zvuk_notification_minus"
-                    val id = resources.getIdentifier(name, "id", packageName)
-                    result.success(view.findViewById<android.view.View>(id)?.performClick())
+                    action.actionIntent.send()
+                    result.success(null)
                 }
             } else if (call.method == "mediaCommand") {
                 val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager

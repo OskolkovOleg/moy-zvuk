@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- audio_service looks up both the notification and action icons by name. -->
 <resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@drawable/ic_stat_music,@drawable/audio_service_*,@drawable/ic_rating_*,@layout/zvuk_notification_*,@id/zvuk_notification_*" />
+    tools:keep="@drawable/ic_stat_music,@drawable/audio_service_*,@drawable/ic_rating_*" />
