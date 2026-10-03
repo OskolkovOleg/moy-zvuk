@@ -67,5 +67,6 @@ Files: lib/playback/notification_controls.dart and music_handler.dart; lib/app_c
 ## Task 6: Compact notification after user feedback
 
 - [x] Combine all expanded controls and score in one row; retain existing action IDs and use weighted widths on narrow screens.
-- [ ] Inspect actual API 30 notification at 320 dp and large text; recheck native buttons.
-- [ ] Build/verify signed 1.10.1+16 and update without clearing data; publish corrected release.
+- [x] Inspect actual API 30 notification at 320 dp and large text; recheck native buttons.
+- [x] Build/verify signed 1.10.1+16 and update on emulator without clearing data; publish corrected release.
+- [ ] Install 1.10.1 directly on the phone when USB is available. Version 1.10.0 installed successfully earlier.
