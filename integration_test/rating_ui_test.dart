@@ -91,6 +91,7 @@ void main() {
         expect(app.unrated, false);
         expect(app.visibleTracks, hasLength(3));
         expect(app.scoreFor(b), 9);
+        expect(find.byType(SnackBar), findsNothing);
         expect(music.error.value, isNull);
         ScaffoldMessenger.of(tester.element(find.byType(TrackTile).first))
             .hideCurrentSnackBar();
@@ -112,6 +113,9 @@ void main() {
           await tester.pumpAndSettle();
         }
         expect(app.scoreFor(b), 13);
+        expect(find.byType(SnackBar), findsNothing);
+        expect(find.byType(SingleChildScrollView), findsNothing);
+        expect(find.text('Далее'), findsNothing);
         expect(find.text('№ 1 из 3 по баллам'), findsOneWidget);
         ScaffoldMessenger.of(tester.element(find.byType(PlayerSheet)))
             .hideCurrentSnackBar();

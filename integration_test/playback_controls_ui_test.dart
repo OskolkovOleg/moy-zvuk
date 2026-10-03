@@ -133,7 +133,9 @@ void main() {
         music.revision.value++;
         await tester.tap(find.byTooltip('Плеер'));
         await tester.pumpAndSettle();
-        await tester.ensureVisible(find.text('Поток подберёт следующую'));
+        expect(find.text('Поток подберёт следующую'), findsNothing);
+        expect(find.text('Далее'), findsNothing);
+        expect(find.byType(SingleChildScrollView), findsNothing);
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
         await binding.takeScreenshot('v160-04-wave-end-large');

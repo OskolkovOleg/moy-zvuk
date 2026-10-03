@@ -17,22 +17,20 @@ String sleepLabel(MusicHandler music) {
 }
 
 class PlaybackControls extends StatelessWidget {
-  const PlaybackControls(this.music, {super.key});
+  const PlaybackControls(this.music, {super.key, required this.center});
   final MusicHandler music;
+  final Widget center;
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Wrap(
-      alignment: WrapAlignment.center,
-      spacing: 8,
+    return Row(
       children: [
-        TextButton.icon(
+        IconButton(
           key: const Key('repeat-mode'),
-          style: TextButton.styleFrom(
-            foregroundColor: music.repeatMode == AudioServiceRepeatMode.none
-                ? scheme.onSurfaceVariant
-                : scheme.primary,
-          ),
+          tooltip: repeatLabel(music.repeatMode),
+          color: music.repeatMode == AudioServiceRepeatMode.none
+              ? scheme.onSurfaceVariant
+              : scheme.primary,
           onPressed: () => music.setRepeatMode(switch (music.repeatMode) {
             AudioServiceRepeatMode.none =>
               music.isWave
@@ -46,18 +44,16 @@ class PlaybackControls extends StatelessWidget {
                 ? Icons.repeat_one_rounded
                 : Icons.repeat_rounded,
           ),
-          label: Text(repeatLabel(music.repeatMode)),
         ),
-        TextButton.icon(
+        Expanded(child: Center(child: center)),
+        IconButton(
           key: const Key('sleep-timer'),
-          style: TextButton.styleFrom(
-            foregroundColor: music.sleepTimer.active
-                ? scheme.primary
-                : scheme.onSurfaceVariant,
-          ),
+          tooltip: sleepLabel(music),
+          color: music.sleepTimer.active
+              ? scheme.primary
+              : scheme.onSurfaceVariant,
           onPressed: () => showSleepTimer(context, music),
           icon: const Icon(Icons.bedtime_outlined),
-          label: Text(sleepLabel(music)),
         ),
       ],
     );

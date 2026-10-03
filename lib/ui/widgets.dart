@@ -5,7 +5,6 @@ import '../data/models.dart';
 import 'track_actions.dart';
 export 'track_actions.dart' show openTrackActions;
 
-String scoreLabel(int score) => score > 0 ? '+$score' : '$score';
 String timeLabel(Duration time) =>
     '${time.inMinutes}:${(time.inSeconds % 60).toString().padLeft(2, '0')}';
 
@@ -117,7 +116,9 @@ class RatingPositionLabel extends StatelessWidget {
     super.key,
     required this.position,
     required this.listTitle,
+    this.compact = false,
   });
+  final bool compact;
   final RatingPosition? position;
   final String listTitle;
 
@@ -125,20 +126,26 @@ class RatingPositionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final rank = position;
     final scheme = Theme.of(context).colorScheme;
+    final label = Text(
+      rank == null
+          ? 'Нет в текущем списке'
+          : '№ ${rank.position} из ${rank.total} по баллам',
+      key: const Key('player-rating-position'),
+      maxLines: compact ? 1 : null,
+      overflow: compact ? TextOverflow.ellipsis : null,
+      style: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: scheme.primary,
+      ),
+    );
+    if (compact) {
+      return Tooltip(message: 'В «$listTitle»', child: label);
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          rank == null
-              ? 'Нет в текущем списке'
-              : '№ ${rank.position} из ${rank.total} по баллам',
-          key: const Key('player-rating-position'),
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: scheme.primary,
-          ),
-        ),
+        label,
         const SizedBox(height: 3),
         Text(
           'В «$listTitle»',
@@ -191,38 +198,14 @@ Future<void> moveWithFeedback(
   }
 }
 
-Future<void> voteWithUndo(
+Future<void> voteWithFeedback(
   BuildContext context,
   AppController app,
   Track track,
   int delta,
 ) async {
-  final accountId = app.account!.id;
-  final wasFiltered = app.unrated;
   try {
-    final event = await app.vote(track, delta);
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        duration: const Duration(seconds: 5),
-        content: Text(
-          '${track.title}: ${scoreLabel(delta)}${wasFiltered ? ' · показаны все треки' : ''}',
-        ),
-        action: SnackBarAction(
-          label: 'Отменить',
-          onPressed: () async {
-            try {
-              await app.undo(accountId, event);
-            } catch (_) {
-              if (context.mounted) {
-                notify(context, 'Не удалось отменить оценку. Попробуй снова.');
-              }
-            }
-          },
-        ),
-      ),
-    );
+    await app.vote(track, delta);
   } catch (_) {
     if (context.mounted) {
       notify(context, 'Оценка не сохранилась. Попробуй ещё раз.');
@@ -345,7 +328,7 @@ class TrackTile extends StatelessWidget {
                 compact: true,
                 score: app.scoreFor(track),
                 title: track.title,
-                onVote: (delta) => voteWithUndo(context, app, track, delta),
+                onVote: (delta) => voteWithFeedback(context, app, track, delta),
               )
             else ...[
               if (manual)
