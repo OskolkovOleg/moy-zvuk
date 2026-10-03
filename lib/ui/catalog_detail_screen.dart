@@ -6,6 +6,8 @@ import '../data/zvuk_api.dart';
 import '../data/models.dart';
 import 'catalog_widgets.dart';
 import 'widgets.dart';
+import 'radio_actions.dart';
+import '../data/wave_source.dart';
 
 class CatalogDetailScreen extends StatefulWidget {
   const CatalogDetailScreen(this.app, this.item, {super.key});
@@ -227,6 +229,17 @@ class _CatalogDetailScreenState extends State<CatalogDetailScreen> {
                                         },
                                   icon: const Icon(Icons.shuffle_rounded),
                                   label: const Text('Перемешать'),
+                                ),
+                                OutlinedButton.icon(
+                                  onPressed: app.api == null
+                                      ? null
+                                      : () => openRadioAction(
+                                          context,
+                                          app,
+                                          WaveSource.fromCatalog(data.item),
+                                        ),
+                                  icon: const Icon(Icons.sensors_rounded),
+                                  label: const Text('Слушать похожее'),
                                 ),
                                 if (data.item.kind == CatalogKind.album ||
                                     data.item.kind == CatalogKind.artist)

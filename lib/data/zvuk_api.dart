@@ -7,9 +7,11 @@ import 'package:http/http.dart' as http;
 import 'models.dart';
 import 'catalog_models.dart';
 import 'personal_models.dart';
+import 'wave_source.dart';
 
 part 'catalog_api.dart';
 part 'personal_api.dart';
+part 'radio_api.dart';
 
 class ZvukException implements Exception {
   const ZvukException(this.message, {this.auth = false});

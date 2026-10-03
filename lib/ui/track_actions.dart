@@ -6,6 +6,8 @@ import '../data/catalog_models.dart';
 import 'catalog_widgets.dart';
 import 'widgets.dart';
 import 'lyrics_screen.dart';
+import 'radio_actions.dart';
+import '../data/wave_source.dart';
 
 Future<void> openTrackActions(
   BuildContext context,
@@ -30,6 +32,12 @@ Future<void> openTrackActions(
             for (final action in <(String, IconData, String)>[
               ('next', Icons.playlist_play_rounded, 'Следующим'),
               ('last', Icons.playlist_add_rounded, 'В конец очереди'),
+              ('radio', Icons.sensors_rounded, 'Поток по песне'),
+              (
+                'similar',
+                Icons.auto_awesome_rounded,
+                'Добавить похожие в очередь',
+              ),
               (
                 'like',
                 app.isFavorite(track.id)
@@ -63,6 +71,14 @@ Future<void> openTrackActions(
   if (value == null || !context.mounted) return;
   try {
     switch (value) {
+      case 'radio':
+      case 'similar':
+        await openRadioAction(
+          context,
+          app,
+          WaveSource.fromTrack(track),
+          appendFor: value == 'similar' ? track : null,
+        );
       case 'next':
       case 'last':
         await app.music.enqueueTrack(track, next: value == 'next');

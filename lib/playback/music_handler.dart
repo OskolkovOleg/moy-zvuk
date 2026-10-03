@@ -9,6 +9,7 @@ import '../data/library_store.dart';
 import '../data/history_store.dart';
 import '../data/models.dart';
 import '../data/zvuk_api.dart';
+import '../data/wave_source.dart';
 import 'playback_queue.dart';
 import 'wave_buffer.dart';
 import 'sleep_timer.dart';
@@ -51,6 +52,9 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
   final sleepTimer = SleepTimerState();
   bool _startingWave = false;
   final _wave = WaveBuffer();
+  WaveSource _waveSource = const WaveSource.personal();
+  WaveSource get waveSource => _waveSource;
+  int _waveCursor = 0;
   int _waveGeneration = 0;
   Future<void>? _fillingWave;
   bool _waitingNext = false;
@@ -83,21 +87,50 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     _fillingWave = null;
     _waitingNext = false;
     isWave = false;
+    _waveSource = const WaveSource.personal();
+    _waveCursor = 0;
   }
 
-  Future<void> startWave() async {
+  Future<List<Track>> _fetchWave(ZvukApi api, int generation) async {
+    final page = await api.recommendations(_waveSource, cursor: _waveCursor);
+    if (generation == _waveGeneration) _waveCursor = page.cursor;
+    return page.tracks;
+  }
+
+  Set<String> get _seedExclusion =>
+      _waveSource.kind == WaveKind.track ? {_waveSource.id} : {};
+
+  Future<void> cancelWaveStart(WaveSource source) async {
+    if (!_startingWave || !identical(_waveSource, source)) return;
     _cancelWave();
     await pause();
-    final generation = _generation;
+  }
+
+  Future<void> startWave({
+    WaveSource source = const WaveSource.personal(),
+  }) async {
+    _cancelWave();
     final waveGeneration = _waveGeneration;
+    _waveSource = source;
+    _startingWave = true;
+    await pause();
+    if (waveGeneration != _waveGeneration || !_startingWave) return;
+    final generation = _generation;
     final api = _api;
-    if (api == null) return;
+    if (api == null) {
+      _startingWave = false;
+      error.value = 'Обнови подключение в настройках.';
+      return;
+    }
     _loading = true;
     _startingWave = true;
     error.value = null;
     _broadcast();
     try {
-      final tracks = await _wave.load(() => api.personalWave(), {});
+      final tracks = await _wave.load(
+        () => _fetchWave(api, waveGeneration),
+        _seedExclusion,
+      );
       if (generation != _generation || waveGeneration != _waveGeneration) {
         return;
       }
@@ -107,10 +140,9 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
         );
       }
       isWave = true;
-      _startingWave = false;
       repeatMode = AudioServiceRepeatMode.none;
       isShuffled = false;
-      sourceTitle = 'Мой поток';
+      sourceTitle = source.queueTitle;
       playlist.replace(tracks, 0);
       _restoredPosition = Duration.zero;
       _publishQueue();
@@ -133,11 +165,17 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     if (!isWave || _api == null) return Future.value();
     if (_fillingWave != null) return _fillingWave!;
     final generation = _waveGeneration, api = _api!;
-    final recent = playlist.tracks.reversed.take(200).map((t) => t.id).toSet();
+    final recent = {
+      ...playlist.tracks.reversed.take(200).map((t) => t.id),
+      ..._seedExclusion,
+    };
     late final Future<void> request;
     request =
         (() async {
-          final tracks = await _wave.load(() => api.personalWave(), recent);
+          final tracks = await _wave.load(
+            () => _fetchWave(api, generation),
+            recent,
+          );
           if (!isWave || generation != _waveGeneration) return;
           for (final track in tracks) {
             playlist.enqueue(track);
@@ -248,6 +286,20 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
         sourceTitle = saved['title'] as String? ?? 'Очередь';
         isShuffled = saved['shuffled'] == true;
         isWave = saved['wave'] == true;
+        if (isWave && saved['waveSource'] != null) {
+          try {
+            _waveSource = WaveSource.fromJson(
+              saved['waveSource'] as Map<String, dynamic>,
+            );
+            final cursor = saved['waveCursor'];
+            _waveCursor = cursor is int && cursor >= 0 ? cursor : 0;
+          } catch (_) {
+            // Preserve cached queue even if optional flow metadata is damaged.
+            isWave = false;
+            _waveSource = const WaveSource.personal();
+            _waveCursor = 0;
+          }
+        }
         repeatMode = switch (saved['repeat']) {
           'one' => AudioServiceRepeatMode.one,
           'all' when !isWave => AudioServiceRepeatMode.all,
@@ -329,6 +381,8 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
         'title': sourceTitle,
         'shuffled': isShuffled,
         'wave': isWave,
+        if (isWave) 'waveSource': _waveSource.toJson(),
+        if (isWave) 'waveCursor': _waveCursor,
         'repeat': repeatMode.name,
         'position':
             (_loaded ? player.position : _restoredPosition).inMilliseconds,

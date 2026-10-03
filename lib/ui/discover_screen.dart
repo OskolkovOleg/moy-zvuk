@@ -5,6 +5,8 @@ import '../data/catalog_models.dart';
 import '../data/models.dart';
 import '../data/zvuk_api.dart';
 import 'catalog_widgets.dart';
+import 'radio_actions.dart';
+import '../data/wave_source.dart';
 
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen(this.app, {super.key});
@@ -68,6 +70,21 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                     label: Text(
                       starting ? 'Подбираем музыку…' : 'Включить поток',
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    onPressed: starting || widget.app.api == null
+                        ? null
+                        : () => openRadioAction(
+                            context,
+                            widget.app,
+                            const WaveSource.favorites(),
+                          ),
+                    style: TextButton.styleFrom(
+                      foregroundColor: scheme.onPrimaryContainer,
+                    ),
+                    icon: const Icon(Icons.favorite_border_rounded),
+                    label: const Text('Поток по любимому'),
                   ),
                   ValueListenableBuilder(
                     valueListenable: widget.app.music.error,
