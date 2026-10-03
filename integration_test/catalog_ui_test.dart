@@ -241,6 +241,8 @@ void main() {
       expect(find.text('Включить поток'), findsOneWidget);
       await binding.takeScreenshot('v140-01-discover');
       await tab('Поиск');
+      await tester.tap(find.text('Треки'));
+      await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'Музыка');
       await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pumpAndSettle();

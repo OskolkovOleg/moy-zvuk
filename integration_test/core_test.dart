@@ -17,12 +17,14 @@ import '../test/personal_store_test.dart' as personal_store;
 
 import '../test/sleep_timer_test.dart' as sleep;
 import '../test/radio_api_test.dart' as radio;
+import '../test/search_test.dart' as search;
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   group('Android SQLite ratings', ratings.main);
   group('Queue', queue.main);
   group('Radio API', radio.main);
+  group('Search', search.main);
   group('Sleep timer', sleep.main);
   group('Lyrics', lyrics.main);
   group('Personal API', personal.main);

@@ -47,21 +47,53 @@ class PlayerScaffold extends StatelessWidget {
 }
 
 class CatalogTile extends StatelessWidget {
-  const CatalogTile(this.item, {super.key, required this.onTap, this.trailing});
+  const CatalogTile(
+    this.item, {
+    super.key,
+    required this.onTap,
+    this.trailing,
+    this.compact = false,
+  });
   final CatalogItem item;
   final VoidCallback onTap;
   final Widget? trailing;
+  final bool compact;
   @override
   Widget build(BuildContext context) => ListTile(
-    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+    contentPadding: EdgeInsets.symmetric(
+      horizontal: compact ? 12 : 20,
+      vertical: compact ? 0 : 4,
+    ),
+    horizontalTitleGap: compact ? 10 : null,
     leading: Artwork(
       Track(id: item.id, title: item.title, imageUrl: item.imageUrl),
-      size: 52,
+      size: compact ? 48 : 52,
     ),
-    title: Text(item.title, maxLines: 2, overflow: TextOverflow.ellipsis),
-    subtitle: item.subtitle.isEmpty
+    title: Text(
+      item.title,
+      maxLines: compact ? 1 : 2,
+      overflow: TextOverflow.ellipsis,
+      style: compact
+          ? const TextStyle(
+              fontSize: 14,
+              height: 1.25,
+              fontWeight: FontWeight.w600,
+            )
+          : null,
+    ),
+    subtitle:
+        item.subtitle.isEmpty && !(compact && item.kind == CatalogKind.album)
         ? null
-        : Text(item.subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+        : Text(
+            compact && item.kind == CatalogKind.album
+                ? (item.subtitle.isEmpty
+                      ? 'Альбом'
+                      : 'Альбом · ${item.subtitle}')
+                : item.subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: compact ? const TextStyle(fontSize: 12) : null,
+          ),
     trailing: trailing ?? const Icon(Icons.chevron_right_rounded),
     onTap: onTap,
   );

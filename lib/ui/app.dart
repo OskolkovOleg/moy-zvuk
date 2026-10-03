@@ -123,7 +123,9 @@ class _ZvukAppState extends State<ZvukApp> with WidgetsBindingObserver {
                           : const SizedBox.shrink(),
                       SearchScreen(
                         app,
-                        key: ValueKey('search:${app.account!.id}'),
+                        key: ValueKey(
+                          'search:${app.account!.id}:${identityHashCode(app.api)}',
+                        ),
                       ),
                       PlaylistsScreen(app),
                     ],
