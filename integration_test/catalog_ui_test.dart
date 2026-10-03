@@ -60,6 +60,10 @@ void main() {
         final v = b['variables'] ?? <String, dynamic>{};
         dynamic result;
         switch (b['operationName']) {
+          case 'savedCatalog':
+            result = {
+              'collection': {'artists': [], 'releases': []},
+            };
           case 'catalogSearch':
             final query = b['query'] as String;
             final field = [
@@ -222,8 +226,15 @@ void main() {
       ..api = api;
     app.tracks = [Track.fromApi(song)];
     app.playlists = lists.values.map(PlaylistInfo.fromJson).toList();
+    Future<void> tap(Finder finder) async {
+      await tester.ensureVisible(finder);
+      await tester.pumpAndSettle();
+      await tester.tap(finder);
+      await tester.pump();
+    }
+
     Future<void> tab(String name) async {
-      await tester.tap(
+      await tap(
         find.descendant(
           of: find.byType(NavigationBar),
           matching: find.text(name),
@@ -241,20 +252,22 @@ void main() {
       expect(find.text('Включить поток'), findsOneWidget);
       await binding.takeScreenshot('v140-01-discover');
       await tab('Поиск');
-      await tester.tap(find.text('Треки'));
+      await tap(find.text('Треки'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'Музыка');
       await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pumpAndSettle();
       expect(find.text('Ночная дорога'), findsOneWidget);
-      await tester.tap(find.byTooltip('Действия: Ночная дорога'));
+      await tap(find.byTooltip('Действия: Ночная дорога'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('В любимое'));
+      await tap(find.text('В любимое'));
       await tester.pumpAndSettle();
       expect(app.isFavorite('t'), true);
-      await tester.tap(find.text('Артисты'));
+      await tester.pump(const Duration(seconds: 5));
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(CatalogTile));
+      await tap(find.text('Артисты'));
+      await tester.pumpAndSettle();
+      await tap(find.byType(CatalogTile));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         find.text('Альбомы и синглы'),
@@ -264,7 +277,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Альбомы и синглы'), findsOneWidget);
       await binding.takeScreenshot('v140-02-artist');
-      await tester.tap(find.text('Новый альбом'));
+      await tap(find.text('Новый альбом'));
       await tester.pumpAndSettle();
       expect(find.byType(CatalogDetailScreen), findsOneWidget);
       await tester.pageBack();
@@ -273,40 +286,40 @@ void main() {
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Альбомы'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Альбомы'));
+      await tap(find.text('Альбомы'));
       await tester.pumpAndSettle();
       expect(find.text('Новый альбом'), findsOneWidget);
       await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Плейлисты'));
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(ChoiceChip, 'Плейлисты'));
+      await tap(find.widgetWithText(ChoiceChip, 'Плейлисты'));
       await tester.pumpAndSettle();
       expect(find.text('Вечерний плейлист'), findsOneWidget);
       await binding.takeScreenshot('v140-03-search');
       await tab('Плейлисты');
-      await tester.tap(find.text('Создать плейлист'));
+      await tap(find.text('Создать плейлист'));
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField).hitTestable(), 'Мой новый');
-      await tester.tap(find.text('Сохранить'));
+      await tap(find.text('Сохранить'));
       await tester.pumpAndSettle();
       expect(app.playlists.any((p) => p.title == 'Мой новый'), true);
-      await tester.tap(find.text('Мой новый'));
+      await tap(find.text('Мой новый'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Плейлист'));
+      await tap(find.byTooltip('Плейлист'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Переименовать'));
+      await tap(find.text('Переименовать'));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byType(TextField).hitTestable(),
         'Другой вечер',
       );
-      await tester.tap(find.text('Сохранить'));
+      await tap(find.text('Сохранить'));
       await tester.pumpAndSettle();
       expect(app.playlists.any((p) => p.title == 'Другой вечер'), true);
-      await tester.tap(find.byTooltip('Плейлист'));
+      await tap(find.byTooltip('Плейлист'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Удалить плейлист'));
+      await tap(find.text('Удалить плейлист'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Удалить'));
+      await tap(find.text('Удалить'));
       await tester.pumpAndSettle();
       expect(app.playlists.any((p) => p.id == 'new'), false);
       tester.platformDispatcher.textScaleFactorTestValue = 1.6;
@@ -318,7 +331,7 @@ void main() {
       await binding.takeScreenshot('v140-05-search-large-text');
       tester.platformDispatcher.clearTextScaleFactorTestValue();
       await tab('Обзор');
-      await tester.tap(find.text('Включить поток'));
+      await tap(find.text('Включить поток'));
       await tester.pumpAndSettle();
       expect(waveRequests, greaterThan(0));
       expect(music.isWave, true);
