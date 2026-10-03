@@ -61,4 +61,4 @@ Files: pubspec.yaml, settings_screen.dart, README.md, docs/verification.md; inte
 - [x] Commit and push; CI passes; publish APK, mirror code and preserve private verification history.
 - [x] Install on physical phone only if it appears; otherwise report ready APK and USB limitation.
 
-**Release result:** v1.6.0 published; signed upgrade 1.5.0 → 1.6.0 preserves fixture state. Phone absent from USB, so physical installation deferred. Full evidence: docs/verification.md.
+**Release result:** v1.6.0 published; signed upgrade 1.5.0 → 1.6.0 preserves fixture state. Physical phone later reconnected: 1.6.0 installed over 1.4.0 with signed adb update; cold launch successful. Full evidence: docs/verification.md.
