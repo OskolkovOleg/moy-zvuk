@@ -35,6 +35,7 @@ required = [icon.group(1)] + [
     'drawable/audio_service_' + name
     for name in ['skip_previous', 'play_arrow', 'pause', 'skip_next', 'stop']
 ]
+required += ['drawable/ic_rating_minus', 'drawable/ic_rating_plus']
 missing = [name for name in required if not re.search(r'\b' + re.escape(name) + r'\s', result.stdout)]
 if missing:
     sys.exit('Release APK is missing notification resources: ' + ', '.join(missing) + '. Check res/raw/keep.xml.')

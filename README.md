@@ -30,6 +30,7 @@ Android-плеер на Flutter для музыки из своего аккау
 - Повтор одного трека или всей очереди. Режим сохраняется при перезапуске; в потоке доступен повтор одного трека.
 - Таймер сна: 5, 15, 30, 60 минут или «После песни». Работает в фоне, по окончании ставит паузу.
 - Фоновое воспроизведение и системное уведомление с управлением музыкой.
+- −1 / +1 в развёрнутом уведомлении вместо кнопки остановки: оценки текущей песни сохраняются в фоне и на паузе, без всплывающих подтверждений. В компактном виде остаются предыдущая песня, пауза и следующая.
 - Восстановление очереди на паузе, локальный кэш библиотеки, экспорт и импорт порядка и оценок.
 
 Ручной порядок и баллы не меняются при перемешивании. Обычная очередь — отдельный снимок; при выключенном повторе после последнего трека музыка останавливается. В режиме «Мой поток» очередь дополняется новыми рекомендациями.
@@ -61,6 +62,7 @@ flutter run -d YOUR_ANDROID_DEVICE
 flutter test integration_test/core_test.dart -d emulator-5554
 flutter drive --driver test_driver/screenshots.dart --target integration_test/search_ui_test.dart -d emulator-5554
 flutter test integration_test/background_controls_test.dart -d emulator-5554
+flutter test integration_test/notification_rating_test.dart -d emulator-5554
 flutter test integration_test/wave_playback_test.dart -d emulator-5554
 flutter test integration_test/playback_controls_test.dart -d emulator-5554
 flutter test integration_test/radio_playback_test.dart -d emulator-5554
@@ -81,6 +83,8 @@ flutter drive --driver test_driver/screenshots.dart --target integration_test/pl
 ```
 
 `JAVA_HOME` должен указывать на JDK 17+. При первой сборке скрипт создаёт личный ключ в `~/.local/share/zvuk-personal/signing/` и локальный `android/key.properties`. Сохраните ключ отдельно: он нужен для следующих обновлений. Эти файлы исключены из Git.
+
+Для дополнительных кнопок уведомления на Android 7–12 используется локальная копия `audio_service` 0.18.19 с небольшой Android-правкой; описание и исходная лицензия сохранены в [third_party/audio_service/PATCHES.md](third_party/audio_service/PATCHES.md). На Android 13+ кнопки передаются через MediaSession.
 
 ### Живые интеграционные тесты
 

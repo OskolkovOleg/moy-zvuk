@@ -15,6 +15,7 @@ import 'wave_buffer.dart';
 import 'sleep_timer.dart';
 
 part 'queue_controls.dart';
+part 'notification_controls.dart';
 
 class MusicHandler extends BaseAudioHandler with SeekHandler {
   MusicHandler(this.store) {
@@ -46,6 +47,8 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
   final playlist = PlaybackQueue();
   final error = ValueNotifier<String?>(null);
   final revision = ValueNotifier<int>(0);
+  Future<void> Function(String account, Track track, int delta)?
+  onNotificationVote;
   String sourceTitle = 'Очередь';
   bool isShuffled = false, isWave = false;
   AudioServiceRepeatMode repeatMode = AudioServiceRepeatMode.none;
@@ -346,12 +349,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     final wantsPlayback = player.playing || _loading;
     playbackState.add(
       PlaybackState(
-        controls: [
-          MediaControl.skipToPrevious,
-          wantsPlayback ? MediaControl.pause : MediaControl.play,
-          MediaControl.skipToNext,
-          MediaControl.stop,
-        ],
+        controls: _notificationControls(wantsPlayback),
         systemActions: const {MediaAction.seek, MediaAction.setRepeatMode},
         androidCompactActionIndices: const [0, 1, 2],
         processingState: _loading
@@ -372,6 +370,10 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
       ),
     );
   }
+
+  @override
+  Future<dynamic> customAction(String name, [Map<String, dynamic>? extras]) =>
+      _rateFromNotification(name);
 
   Future<void> _save() async {
     final account = _account;

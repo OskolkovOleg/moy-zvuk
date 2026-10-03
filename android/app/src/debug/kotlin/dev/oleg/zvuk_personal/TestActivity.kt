@@ -20,13 +20,44 @@ class TestActivity : AudioServiceActivity() {
                 val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
                 val active = manager.activeNotifications.firstOrNull { it.notification.category == Notification.CATEGORY_TRANSPORT }
                 val notification = active?.notification
+                @Suppress("DEPRECATION")
+                val token = notification?.extras?.getParcelable<MediaSession.Token>(Notification.EXTRA_MEDIA_SESSION)
+                val state = token?.let { MediaController(this, it).playbackState }
                 result.success(mapOf(
                     "present" to (notification != null),
                     "foreground" to ((notification?.flags ?: 0) and Notification.FLAG_FOREGROUND_SERVICE != 0),
                     "ongoing" to ((notification?.flags ?: 0) and Notification.FLAG_ONGOING_EVENT != 0),
                     "actions" to (notification?.actions?.map { it.title.toString() } ?: emptyList<String>()),
-                    "title" to notification?.extras?.getCharSequence(Notification.EXTRA_TITLE)?.toString()
+                    "title" to notification?.extras?.getCharSequence(Notification.EXTRA_TITLE)?.toString(),
+                    "customActions" to (state?.customActions?.map { it.action } ?: emptyList<String>()),
+                    "customLabels" to (state?.customActions?.map { it.name.toString() } ?: emptyList<String>()),
+                    "customIcons" to (state?.customActions?.map { it.icon } ?: emptyList<Int>()),
+                    "sdk" to android.os.Build.VERSION.SDK_INT
                 ))
+            } else if (call.method == "notificationAction" || call.method == "customMediaAction") {
+                val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+                val notification = manager.activeNotifications.firstOrNull { it.notification.category == Notification.CATEGORY_TRANSPORT }?.notification
+                if (call.method == "notificationAction") {
+                    val action = notification?.actions?.firstOrNull { it.title.toString() == call.arguments as String }
+                    if (action == null) result.error("NO_ACTION", "Missing notification action", null)
+                    else {
+                        action.actionIntent.send()
+                        result.success(null)
+                    }
+                } else {
+                    @Suppress("DEPRECATION")
+                    val token = notification?.extras?.getParcelable<MediaSession.Token>(Notification.EXTRA_MEDIA_SESSION)
+                    if (token == null) result.error("NO_SESSION", "No media session", null)
+                    else {
+                        val controller = MediaController(this, token)
+                        val action = controller.playbackState?.customActions?.firstOrNull { it.name.toString() == call.arguments as String }
+                        if (action == null) result.error("NO_ACTION", "Missing media action", null)
+                        else {
+                            controller.transportControls.sendCustomAction(action, action.extras)
+                            result.success(null)
+                        }
+                    }
+                }
             } else if (call.method == "mediaCommand") {
                 val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
                 val notification = manager.activeNotifications.firstOrNull { it.notification.category == Notification.CATEGORY_TRANSPORT }?.notification

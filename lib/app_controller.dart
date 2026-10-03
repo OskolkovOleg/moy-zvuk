@@ -13,7 +13,27 @@ import 'playback/shuffle_tracks.dart';
 part 'personal_controller.dart';
 
 class AppController extends ChangeNotifier {
-  AppController(this.store, this.music, {this.tokens = const TokenStore()});
+  AppController(this.store, this.music, {this.tokens = const TokenStore()}) {
+    music.onNotificationVote = _voteFromNotification;
+  }
+
+  Future<void> _voteFromNotification(
+    String accountId,
+    Track track,
+    int delta,
+  ) async {
+    if (account?.id != accountId) return;
+    await vote(track, delta);
+  }
+
+  @override
+  void dispose() {
+    if (music.onNotificationVote == _voteFromNotification) {
+      music.onNotificationVote = null;
+    }
+    super.dispose();
+  }
+
   final LibraryStore store;
   final MusicHandler music;
   final TokenStore tokens;
@@ -291,8 +311,9 @@ class AppController extends ChangeNotifier {
   Future<String> vote(Track track, int delta) async {
     final id = account!.id;
     final event = await store.vote(id, track, delta);
+    final updated = await store.ratings(id);
     if (account?.id == id) {
-      ratings = await store.ratings(id);
+      ratings = updated;
       // Keep the song visible after its first vote rather than hiding it in
       // the unrated-only view. Votes never alter library membership or queue.
       unrated = false;
