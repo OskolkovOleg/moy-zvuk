@@ -5,6 +5,7 @@ extension ZvukRadio on ZvukApi {
     WaveSource source, {
     int cursor = 0,
     int count = 15,
+    WaveOptions options = const WaveOptions(),
   }) async {
     if (count < 1 || count > 50 || cursor < 0) {
       throw ArgumentError('Invalid recommendation page');
@@ -16,6 +17,9 @@ extension ZvukRadio on ZvukApi {
       return RadioPage(
         await personalWave(
           count: count,
+          options: source.kind == WaveKind.personal
+              ? options
+              : const WaveOptions(),
           waveInput: switch (source.kind) {
             WaveKind.favorites => {'waveType': 'FAVTRACKS'},
             WaveKind.playlist => {

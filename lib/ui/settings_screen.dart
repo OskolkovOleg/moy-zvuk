@@ -247,7 +247,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         const SizedBox(height: 36),
         Text(
-          'Мой Звук · 1.8.2',
+          'Мой Звук · 1.9.0',
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: 8),
@@ -260,7 +260,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onPressed: () => showLicensePage(
             context: context,
             applicationName: 'Мой Звук',
-            applicationVersion: '1.8.2',
+            applicationVersion: '1.9.0',
           ),
           child: const Text('Лицензии компонентов'),
         ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app_controller.dart';
 import '../data/models.dart';
 import 'track_actions.dart';
+import 'artist_navigation.dart';
 export 'track_actions.dart' show openTrackActions;
 
 String timeLabel(Duration time) =>
@@ -306,10 +307,9 @@ class TrackTile extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(height: 3),
-                            Text(
-                              track.artists,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            ArtistLink(
+                              app,
+                              track,
                               style: TextStyle(
                                 fontSize: 12,
                                 color: scheme.onSurfaceVariant,

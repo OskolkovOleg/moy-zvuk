@@ -48,10 +48,9 @@ class _PlayerContent extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      track.artists,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    ArtistLink(
+                      app,
+                      track,
                       style: TextStyle(
                         fontSize: 14,
                         height: 1.3,

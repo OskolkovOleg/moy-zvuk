@@ -10,12 +10,14 @@ import '../data/history_store.dart';
 import '../data/models.dart';
 import '../data/zvuk_api.dart';
 import '../data/wave_source.dart';
+import '../data/wave_options.dart';
 import 'playback_queue.dart';
 import 'wave_buffer.dart';
 import 'sleep_timer.dart';
 
 part 'queue_controls.dart';
 part 'notification_controls.dart';
+part 'wave_preferences.dart';
 
 class MusicHandler extends BaseAudioHandler with SeekHandler {
   MusicHandler(this.store) {
@@ -57,6 +59,8 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
   final _wave = WaveBuffer();
   WaveSource _waveSource = const WaveSource.personal();
   WaveSource get waveSource => _waveSource;
+  WaveOptions _waveOptions = const WaveOptions();
+  WaveOptions get waveOptions => _waveOptions;
   int _waveCursor = 0;
   int _waveGeneration = 0;
   Future<void>? _fillingWave;
@@ -95,7 +99,11 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
   }
 
   Future<List<Track>> _fetchWave(ZvukApi api, int generation) async {
-    final page = await api.recommendations(_waveSource, cursor: _waveCursor);
+    final page = await api.recommendations(
+      _waveSource,
+      cursor: _waveCursor,
+      options: _waveOptions,
+    );
     if (generation == _waveGeneration) _waveCursor = page.cursor;
     return page.tracks;
   }
@@ -282,6 +290,9 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     isShuffled = false;
     repeatMode = AudioServiceRepeatMode.none;
     _restoredPosition = Duration.zero;
+    _waveOptions = WaveOptions.fromJson(
+      await store.get(account, 'waveOptions'),
+    );
     final saved = await store.get(account, 'queue');
     if (saved is Map<String, dynamic>) {
       try {
@@ -547,14 +558,21 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     if (!playlist.hasNext && isWave) {
       _waitingNext = true;
       final generation = _generation;
-      final waveGeneration = _waveGeneration;
       _loading = true;
       _broadcast();
       try {
-        await _fillWave();
-        if (generation != _generation || waveGeneration != _waveGeneration) {
-          return;
+        while (isWave && !playlist.hasNext) {
+          final waveGeneration = _waveGeneration;
+          try {
+            await _fillWave();
+          } catch (_) {
+            if (waveGeneration != _waveGeneration) continue;
+            rethrow;
+          }
+          if (generation != _generation) return;
+          if (waveGeneration == _waveGeneration) break;
         }
+        if (generation != _generation || !isWave) return;
         if (!playlist.hasNext) {
           throw const ZvukException(
             'Поток пока не подобрал новые песни. Нажми «Следующая» ещё раз.',
@@ -567,8 +585,8 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
         }
         return;
       } finally {
-        if (waveGeneration == _waveGeneration) _waitingNext = false;
         if (generation == _generation) {
+          _waitingNext = false;
           _loading = false;
           _broadcast();
         }

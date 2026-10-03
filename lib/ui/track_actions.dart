@@ -4,6 +4,7 @@ import '../app_controller.dart';
 import '../data/models.dart';
 import '../data/catalog_models.dart';
 import 'catalog_widgets.dart';
+import 'artist_navigation.dart';
 import 'widgets.dart';
 import 'lyrics_screen.dart';
 import 'radio_actions.dart';
@@ -47,7 +48,7 @@ Future<void> openTrackActions(
               ),
               ('playlist', Icons.library_add_outlined, 'В плейлист'),
               ('lyrics', Icons.lyrics_outlined, 'Текст песни'),
-              if (track.artistIds.isNotEmpty)
+              if (track.artists.isNotEmpty || track.artistIds.isNotEmpty)
                 ('artist', Icons.person_outline_rounded, 'К артисту'),
               if (track.releaseId != null)
                 ('album', Icons.album_outlined, 'К альбому'),
@@ -103,37 +104,7 @@ Future<void> openTrackActions(
       case 'playlist':
         await chooseTrackPlaylist(context, app, track);
       case 'artist':
-        var id = track.artistIds.first;
-        if (track.artistIds.length > 1) {
-          final names = track.artists.split(', ');
-          final selected = await showModalBottomSheet<String>(
-            context: context,
-            showDragHandle: true,
-            builder: (sheet) => SafeArea(
-              child: ListView(
-                shrinkWrap: true,
-                children: [
-                  for (var i = 0; i < track.artistIds.length; i++)
-                    ListTile(
-                      title: Text(
-                        i < names.length ? names[i] : 'Артист ${i + 1}',
-                      ),
-                      onTap: () => Navigator.pop(sheet, track.artistIds[i]),
-                    ),
-                ],
-              ),
-            ),
-          );
-          if (selected == null || !context.mounted) return;
-          id = selected;
-        }
-        if (context.mounted) {
-          await openCatalog(
-            context,
-            app,
-            CatalogItem(id: id, title: 'Артист', kind: CatalogKind.artist),
-          );
-        }
+        await openTrackArtist(context, app, track);
       case 'album':
         await openCatalog(
           context,

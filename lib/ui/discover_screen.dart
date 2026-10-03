@@ -7,6 +7,7 @@ import '../data/zvuk_api.dart';
 import 'catalog_widgets.dart';
 import 'radio_actions.dart';
 import '../data/wave_source.dart';
+import 'wave_settings.dart';
 
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen(this.app, {super.key});
@@ -72,6 +73,32 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
+                  ValueListenableBuilder(
+                    valueListenable: widget.app.music.revision,
+                    builder: (_, _, _) => TextButton.icon(
+                      onPressed: starting || widget.app.account == null
+                          ? null
+                          : () => openWaveSettings(context, widget.app),
+                      style: TextButton.styleFrom(
+                        foregroundColor: scheme.onPrimaryContainer,
+                        alignment: Alignment.centerLeft,
+                      ),
+                      icon: const Icon(Icons.tune_rounded),
+                      label: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Настроить поток'),
+                          Text(
+                            widget.app.music.waveOptions.summary,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
                   TextButton.icon(
                     onPressed: starting || widget.app.api == null
                         ? null

@@ -99,11 +99,16 @@ extension ZvukCatalog on ZvukApi {
   Future<List<Track>> personalWave({
     int count = 15,
     Map<String, dynamic>? waveInput,
+    WaveOptions options = const WaveOptions(),
   }) async {
     final data = await _graph(
       'getPersonalWave',
-      'query getPersonalWave(\$first: PositiveInt!, \$waveInput: WaveInput) { personalWaveContent(first: \$first, waveInput: \$waveInput) { ${ZvukApi._fields} } }',
-      {'first': count, 'waveInput': ?waveInput},
+      'query getPersonalWave(\$first: PositiveInt!, \$waveInput: WaveInput, \$options: PersonalWaveOptions) { personalWaveContent(first: \$first, waveInput: \$waveInput, options: \$options) { ${ZvukApi._fields} } }',
+      {
+        'first': count,
+        'waveInput': ?waveInput,
+        if (!options.isDefault) 'options': options.toApi(),
+      },
     );
     return (data['personalWaveContent'] as List? ?? [])
         .whereType<Map<String, dynamic>>()

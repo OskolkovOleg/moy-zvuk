@@ -10,6 +10,7 @@ import 'widgets.dart';
 import 'lyrics_screen.dart';
 import 'queue_view.dart';
 import 'playback_controls.dart';
+import 'artist_navigation.dart';
 
 part 'player_content.dart';
 

@@ -6,12 +6,14 @@ class Track {
     this.duration = 0,
     this.imageUrl,
     this.artistIds = const [],
+    this.artistNames = const [],
     this.releaseId,
   });
   final String id, title, artists;
   final int duration;
   final String? imageUrl, releaseId;
   final List<String> artistIds;
+  final List<String> artistNames;
 
   factory Track.fromApi(Map<String, dynamic> json) => Track(
     id: json['id'].toString(),
@@ -26,6 +28,10 @@ class Track {
         .where((a) => a['id'] != null)
         .map((a) => a['id'].toString())
         .toList(),
+    artistNames: (json['artists'] as List? ?? [])
+        .where((a) => a['id'] != null)
+        .map((a) => a['title']?.toString() ?? 'Артист')
+        .toList(),
   );
   factory Track.fromJson(Map<String, dynamic> json) => Track(
     id: json['id'] as String,
@@ -35,6 +41,7 @@ class Track {
     imageUrl: json['imageUrl'] as String?,
     releaseId: json['releaseId'] as String?,
     artistIds: (json['artistIds'] as List? ?? []).cast<String>(),
+    artistNames: (json['artistNames'] as List? ?? []).cast<String>(),
   );
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -44,6 +51,7 @@ class Track {
     'imageUrl': imageUrl,
     'releaseId': releaseId,
     'artistIds': artistIds,
+    'artistNames': artistNames,
   };
 }
 
