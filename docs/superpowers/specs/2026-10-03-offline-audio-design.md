@@ -29,3 +29,7 @@ Test SQLite v1→v2 preservation, restart persistence, account isolation, cancel
 ## Accepted addition: notification score
 
 Show live score after votes from both app and notification, including offline/background playback. Android 7–12 expanded notification uses a decorated custom notification with a genuine minus / score / plus row and the three transport controls in that view. Android 13+ system media cards control their own layout; keep their five controls and put the live score in artist metadata. Carry the score in existing custom-action extras so native equality triggers a refresh; action identities retain stale track/account guards. Verify real custom-view PendingIntents on API 30 and MediaSession actions on API 36. Keep runtime resources after release shrinking.
+
+## Follow-up: compact notification (1.10.1)
+
+User feedback after installing 1.10.0: the expanded notification is too tall. Combine previous/play/next and minus/score/plus in one row below title/artist. Reuse all existing IDs/PendingIntents and ordinary notification style. Weighted button widths fit a 320 dp screen; preserve 48 dp row height, reduce artwork to 36 dp and allow metadata to grow for large text. Android 13+ system layout is unchanged. Verify actual visible layout and actions on API 30, then signed update and direct installation.

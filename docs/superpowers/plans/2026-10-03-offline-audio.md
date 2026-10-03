@@ -63,3 +63,9 @@ Files: lib/playback/notification_controls.dart and music_handler.dart; lib/app_c
 - [x] Publish `zvukRatingScore` extras on existing minus/plus actions; update current MediaItem artist metadata when scores change.
 - [x] Decorated custom notification on API <33 contains minus/score/plus; include three transport controls in that view. Android 13+ keeps standard MediaSession layout and live subtitle score.
 - [x] Verify real RemoteViews clicks and MediaSession actions, immediate 10→11→12 score updates without playback disruption, account/track changes, stale actions, native resources and actual screenshots.
+
+## Task 6: Compact notification after user feedback
+
+- [x] Combine all expanded controls and score in one row; retain existing action IDs and use weighted widths on narrow screens.
+- [ ] Inspect actual API 30 notification at 320 dp and large text; recheck native buttons.
+- [ ] Build/verify signed 1.10.1+16 and update without clearing data; publish corrected release.
