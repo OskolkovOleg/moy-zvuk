@@ -8,6 +8,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import '../data/library_store.dart';
+import '../data/audio_preferences.dart';
 import '../data/models.dart';
 import '../data/zvuk_api.dart';
 import 'download_record.dart';
@@ -29,6 +30,7 @@ class DownloadManager extends ChangeNotifier {
   final http.Client Function() _clientFactory;
   final Directory _directory;
   final int maxBytes;
+  AudioQuality quality = AudioQuality.high;
   List<DownloadRecord> _items = [];
   List<DownloadRecord> get items => List.unmodifiable(_items);
   List<Track> get tracks => _items
@@ -302,7 +304,9 @@ class DownloadManager extends ChangeNotifier {
       if (api == null) {
         throw const _DownloadFailure('Подключи Звук и повтори загрузку.');
       }
-      final url = Uri.tryParse(await job.run(api.streamUrl(item.track.id)));
+      final url = Uri.tryParse(
+        await job.run(api.streamUrl(item.track.id, quality: quality)),
+      );
       job.check();
       if (url == null ||
           url.host.isEmpty ||

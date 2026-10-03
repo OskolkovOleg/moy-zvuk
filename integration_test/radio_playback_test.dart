@@ -13,6 +13,7 @@ import 'package:zvuk_personal/data/library_store.dart';
 import 'package:zvuk_personal/data/models.dart';
 import 'package:zvuk_personal/data/wave_source.dart';
 import 'package:zvuk_personal/data/zvuk_api.dart';
+import 'package:zvuk_personal/data/audio_preferences.dart';
 import 'package:zvuk_personal/playback/music_handler.dart';
 import 'package:zvuk_personal/playback/service_config.dart';
 
@@ -24,7 +25,10 @@ class RadioFixtureApi extends ZvukApi {
   int streams = 0;
   Completer<void>? streamGate;
   @override
-  Future<String> streamUrl(String id) async {
+  Future<String> streamUrl(
+    String id, {
+    AudioQuality quality = AudioQuality.high,
+  }) async {
     streams++;
     final wait = streamGate;
     if (wait != null) await wait.future;

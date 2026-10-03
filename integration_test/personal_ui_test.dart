@@ -13,6 +13,7 @@ import 'package:zvuk_personal/data/library_store.dart';
 import 'package:zvuk_personal/data/history_store.dart';
 import 'package:zvuk_personal/data/models.dart';
 import 'package:zvuk_personal/data/zvuk_api.dart';
+import 'package:zvuk_personal/data/audio_preferences.dart';
 import 'package:zvuk_personal/playback/music_handler.dart';
 import 'package:zvuk_personal/playback/service_config.dart';
 import 'package:zvuk_personal/ui/app.dart';
@@ -27,7 +28,10 @@ class PersonalFixtureApi extends ZvukApi {
     : super('fixture', client: client);
   final int port;
   @override
-  Future<String> streamUrl(String id) async {
+  Future<String> streamUrl(
+    String id, {
+    AudioQuality quality = AudioQuality.high,
+  }) async {
     if (id == 'broken') throw const ZvukException('Synthetic failure');
     return 'http://127.0.0.1:$port/$id.wav';
   }

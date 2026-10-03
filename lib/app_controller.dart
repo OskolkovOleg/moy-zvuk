@@ -337,6 +337,7 @@ class AppController extends ChangeNotifier {
     final added = await store.importRatings(id, source);
     if (account?.id == id) {
       ratings = await store.ratings(id);
+      music.setNotificationRatings(id, ratings);
       final selected = listId;
       final order = await store.loadOrder(id, selected);
       if (account?.id == id && listId == selected) manualOrder = order;

@@ -5,6 +5,13 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../app_controller.dart';
+import '../app_version.dart';
+import '../data/models.dart';
+import '../downloads/download_record.dart';
+import 'downloads_screen.dart';
+import 'playback_controls.dart';
+import 'settings_widgets.dart';
+import 'wave_settings.dart';
 import 'widgets.dart';
 
 class ConnectForm extends StatefulWidget {
@@ -133,10 +140,74 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool transferring = false;
+  bool savingQuality = false;
+
+  Future<void> quality({required bool downloads}) async {
+    final app = widget.app;
+    final account = app.account?.id;
+    final preferences = app.music.audioPreferences;
+    final value = await chooseAudioQuality(
+      context,
+      title: downloads ? 'Качество скачивания' : 'Качество музыки',
+      current: downloads ? preferences.downloads : preferences.streaming,
+    );
+    if (value == null || !mounted) return;
+    if (account != app.account?.id) {
+      notify(context, 'Аккаунт изменился. Открой настройки снова.');
+      return;
+    }
+    setState(() => savingQuality = true);
+    try {
+      await app.music.setAudioPreferences(
+        app.music.audioPreferences.copyWith(
+          streaming: downloads ? null : value,
+          downloads: downloads ? value : null,
+        ),
+      );
+    } catch (_) {
+      if (mounted) notify(context, 'Качество не сохранилось. Попробуй снова.');
+    } finally {
+      if (mounted) setState(() => savingQuality = false);
+    }
+  }
+
+  Future<void> sort() async {
+    final app = widget.app, account = widget.app.account?.id;
+    final ranked = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheet) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final value in [false, true])
+              ListTile(
+                title: Text(value ? 'По баллам' : 'Мой порядок'),
+                subtitle: Text(
+                  value
+                      ? 'Самые ценные песни сверху'
+                      : 'Порядок, который ты задаёшь стрелками',
+                ),
+                trailing: app.ranked == value
+                    ? const Icon(Icons.check_rounded)
+                    : null,
+                onTap: () => Navigator.pop(sheet, value),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (ranked != null && account == app.account?.id) {
+      await app.setSort(ranked);
+    }
+  }
+
   Future<void> exportBackup() async {
+    final account = widget.app.account?.id;
+    if (account == null || transferring) return;
     setState(() => transferring = true);
     try {
-      final json = await widget.app.store.exportRatings(widget.app.account!.id);
+      final json = await widget.app.store.exportRatings(account);
       final uri = await FilePicker.saveFile(
         dialogTitle: 'Сохранить оценки',
         fileName:
@@ -154,6 +225,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> importBackup() async {
+    final account = widget.app.account?.id;
+    if (account == null || transferring) return;
     setState(() => transferring = true);
     try {
       final file = await FilePicker.pickFile(
@@ -168,6 +241,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final bytes = await file.readAsBytes();
       if (bytes.length > 20 * 1024 * 1024) {
         throw const FormatException('Файл слишком большой');
+      }
+      if (widget.app.account?.id != account) {
+        throw const FormatException(
+          'Аккаунт изменился. Открой настройки снова.',
+        );
       }
       final count = await widget.app.importRatings(utf8.decode(bytes));
       if (mounted) {
@@ -187,84 +265,203 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: widget.app,
-    builder: (context, _) => ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        Text('Подключение', style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 12),
-        Text(
-          widget.app.account?.name ?? 'Мой аккаунт',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        Text(
-          'ID ${widget.app.account?.id ?? ''}',
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        const SizedBox(height: 20),
-        ExpansionTile(
-          tilePadding: EdgeInsets.zero,
-          title: const Text('Заменить токен'),
-          childrenPadding: const EdgeInsets.only(top: 12, bottom: 12),
-          children: [
-            ConnectForm(
-              widget.app,
-              onConnected: () => notify(context, 'Подключение обновлено'),
+    animation: Listenable.merge([
+      widget.app,
+      widget.app.music.revision,
+      widget.app.music.downloads,
+    ]),
+    builder: (context, _) {
+      final app = widget.app,
+          music = app.music,
+          downloads = app.music.downloads;
+      final scheme = Theme.of(context).colorScheme;
+      final preferences = music.audioPreferences;
+      return ListView(
+        key: const Key('settings-list'),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 8, 4, 28),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.asset(
+                    'assets/brand/icon.png',
+                    width: 48,
+                    height: 48,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        app.account?.name ?? 'Мой аккаунт',
+                        style: Theme.of(context).textTheme.titleLarge
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        app.api == null
+                            ? 'Сохранённая библиотека'
+                            : 'Звук подключён',
+                        style: TextStyle(
+                          color: scheme.onSurfaceVariant,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-        const SizedBox(height: 32),
-        Text(
-          'Порядок и оценки',
-          style: Theme.of(context).textTheme.headlineSmall,
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          'Копия содержит порядок списков и оценки. При восстановлении уже настроенный порядок остаётся, а повторные оценки пропускаются.',
-        ),
-        const SizedBox(height: 20),
-        FilledButton.tonalIcon(
-          onPressed: transferring ? null : exportBackup,
-          icon: const Icon(Icons.ios_share_rounded),
-          label: const Padding(
-            padding: EdgeInsets.all(12),
-            child: Text('Сохранить в файл'),
           ),
-        ),
-        const SizedBox(height: 10),
-        OutlinedButton.icon(
-          onPressed: transferring ? null : importBackup,
-          icon: const Icon(Icons.file_open_outlined),
-          label: const Padding(
-            padding: EdgeInsets.all(12),
-            child: Text('Восстановить из файла'),
+          SettingsSection(
+            title: 'Воспроизведение',
+            note: 'Новое качество применяется к следующей песне. Скачанные треки играют из сохранённого файла.',
+            children: [
+              SettingsRow(
+                key: const Key('settings-stream-quality'),
+                icon: Icons.graphic_eq_rounded,
+                title: 'Качество музыки',
+                subtitle: preferences.streaming.label,
+                busy: savingQuality,
+                onTap: () => quality(downloads: false),
+              ),
+              SettingsRow(
+                key: const Key('settings-repeat'),
+                icon: Icons.repeat_rounded,
+                title: 'Повтор',
+                subtitle: settingsRepeatLabel(music.repeatMode),
+                onTap: () => chooseRepeatMode(context, music),
+              ),
+              SettingsRow(
+                key: const Key('settings-sleep'),
+                icon: Icons.bedtime_outlined,
+                title: 'Таймер сна',
+                subtitle: music.sleepTimer.active
+                    ? sleepLabel(music)
+                    : 'Выключен',
+                onTap: () => showSleepTimer(context, music),
+              ),
+              SettingsRow(
+                key: const Key('settings-wave'),
+                icon: Icons.waves_rounded,
+                title: 'Мой поток',
+                subtitle: 'Настроение, жанры и новые песни',
+                onTap: () => openWaveSettings(context, app),
+              ),
+            ],
           ),
-        ),
-        if (transferring)
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: LinearProgressIndicator(),
+          SettingsSection(
+            title: 'Скачивания',
+            note: 'Качество меняется для новых загрузок. Скачивание использует текущую сеть, в том числе мобильную.',
+            children: [
+              SettingsRow(
+                key: const Key('settings-download-quality'),
+                icon: Icons.download_rounded,
+                title: 'Качество скачивания',
+                subtitle: preferences.downloads.label,
+                busy: savingQuality,
+                onTap: () => quality(downloads: true),
+              ),
+              SettingsRow(
+                key: const Key('settings-downloads'),
+                icon: Icons.folder_outlined,
+                title: 'Скачанная музыка',
+                subtitle:
+                    '${trackCountLabel(downloads.tracks.length)} · ${downloadSize(downloads.storedBytes)}${downloads.pendingCount == 0 ? '' : ' · в очереди: ${downloads.pendingCount}'}',
+                onTap: () => Navigator.of(context).push<void>(
+                  MaterialPageRoute(builder: (_) => DownloadsScreen(app)),
+                ),
+              ),
+            ],
           ),
-        const SizedBox(height: 36),
-        Text(
-          'Мой Звук · 1.9.0',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Личное неофициальное приложение. Порядок и оценки хранятся на телефоне. Воспроизведение требует интернета и доступа к треку в Звуке.',
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        const SizedBox(height: 12),
-        TextButton(
-          onPressed: () => showLicensePage(
-            context: context,
-            applicationName: 'Мой Звук',
-            applicationVersion: '1.9.0',
+          SettingsSection(
+            title: 'Библиотека и баллы',
+            note: 'Каждая песня начинает с 10 баллов. Минус снижает балл и оставляет песню в списке.',
+            children: [
+              SettingsRow(
+                key: const Key('settings-sort'),
+                icon: Icons.sort_rounded,
+                title: 'Порядок песен',
+                subtitle: app.ranked ? 'По баллам' : 'Мой порядок',
+                onTap: sort,
+              ),
+              SettingsRow(
+                key: const Key('settings-export'),
+                icon: Icons.ios_share_rounded,
+                title: 'Сохранить в файл',
+                subtitle: 'Резервная копия баллов и порядка',
+                busy: transferring,
+                onTap: app.account == null ? null : exportBackup,
+              ),
+              SettingsRow(
+                key: const Key('settings-import'),
+                icon: Icons.file_open_outlined,
+                title: 'Восстановить из файла',
+                subtitle: 'Повторные оценки пропускаются',
+                busy: transferring,
+                onTap: app.account == null ? null : importBackup,
+              ),
+            ],
           ),
-          child: const Text('Лицензии компонентов'),
-        ),
-      ],
-    ),
+          SettingsSection(
+            title: 'Аккаунт',
+            children: [
+              ExpansionTile(
+                key: const Key('settings-token'),
+                tilePadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
+                leading: const Icon(Icons.key_rounded, size: 22),
+                title: const Text(
+                  'Заменить токен',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+                subtitle: const Text(
+                  'Подключение к твоему аккаунту',
+                  style: TextStyle(fontSize: 13),
+                ),
+                shape: const Border(),
+                collapsedShape: const Border(),
+                childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                children: [
+                  ConnectForm(
+                    app,
+                    onConnected: () => notify(context, 'Подключение обновлено'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          SettingsSection(
+            title: 'Приложение',
+            note: 'Личный неофициальный клиент Звука. Баллы, порядок и скачанная музыка хранятся на этом телефоне.',
+            children: [
+              const SettingsRow(
+                icon: Icons.music_note_rounded,
+                title: 'Мой Звук',
+                subtitle: 'Версия $appVersion',
+              ),
+              SettingsRow(
+                key: const Key('settings-licenses'),
+                icon: Icons.description_outlined,
+                title: 'Лицензии компонентов',
+                subtitle: 'Открытые библиотеки приложения',
+                onTap: () => showLicensePage(
+                  context: context,
+                  applicationName: 'Мой Звук',
+                  applicationVersion: appVersion,
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    },
   );
 }

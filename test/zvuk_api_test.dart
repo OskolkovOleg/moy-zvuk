@@ -4,9 +4,33 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:zvuk_personal/data/zvuk_api.dart';
+import 'package:zvuk_personal/data/audio_preferences.dart';
 import 'package:zvuk_personal/data/models.dart';
 
 void main() {
+  test(
+    'Streaming sends the selected quality only to the authenticated API',
+    () async {
+      final qualities = <String?>[];
+      final api = ZvukApi(
+        'test-secret',
+        client: MockClient((request) async {
+          expect(request.url.host, 'zvuk.com');
+          expect(request.url.scheme, 'https');
+          expect(request.headers['X-Auth-Token'], 'test-secret');
+          qualities.add(request.url.queryParameters['quality']);
+          return http.Response(
+            '{"result":{"stream":"https://audio.example/track.mp3"}}',
+            200,
+          );
+        }),
+      );
+      await api.streamUrl('one');
+      await api.streamUrl('one', quality: AudioQuality.economy);
+      expect(qualities, ['high', 'mid']);
+      api.close();
+    },
+  );
   Map<String, dynamic> track(int i) => {
     'id': '$i',
     'title': 'Track $i',

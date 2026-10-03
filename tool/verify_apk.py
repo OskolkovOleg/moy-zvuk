@@ -29,6 +29,13 @@ icon = re.search(r"androidNotificationIcon:\s*'([^']+)'", config)
 if not icon:
     sys.exit('Could not find the notification icon configuration.')
 result = subprocess.run([aapt, 'dump', 'resources', str(apk)], capture_output=True, text=True, check=True)
+version = re.search(r'^version:\s*(\S+)', (root / 'pubspec.yaml').read_text(), re.MULTILINE).group(1)
+name, code = version.split('+')
+display_version = re.search(r"const appVersion = '([^']+)'", (root / 'lib/app_version.dart').read_text()).group(1)
+badging = subprocess.run([aapt, 'dump', 'badging', str(apk)], capture_output=True, text=True, check=True).stdout
+if display_version != name or f"versionName='{name}'" not in badging or f"versionCode='{code}'" not in badging:
+    sys.exit('Release version differs from pubspec or the settings screen.')
+print(f'Release and settings version verified: {name}+{code}')
 # MediaControl's built-in action icons are also looked up by name from Dart.
 # A notification may have working actions yet render no buttons without them.
 required = [icon.group(1)] + [

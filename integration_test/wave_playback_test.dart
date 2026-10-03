@@ -12,6 +12,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:zvuk_personal/data/library_store.dart';
 import 'package:zvuk_personal/data/models.dart';
 import 'package:zvuk_personal/data/zvuk_api.dart';
+import 'package:zvuk_personal/data/audio_preferences.dart';
 import 'package:zvuk_personal/playback/music_handler.dart';
 import 'package:zvuk_personal/playback/service_config.dart';
 
@@ -21,7 +22,10 @@ class WaveClipApi extends ZvukApi {
   WaveClipApi(this.port, http.Client client) : super('fixture', client: client);
   final int port;
   @override
-  Future<String> streamUrl(String id) async => 'http://127.0.0.1:$port/$id.wav';
+  Future<String> streamUrl(
+    String id, {
+    AudioQuality quality = AudioQuality.high,
+  }) async => 'http://127.0.0.1:$port/$id.wav';
 }
 
 void main() {

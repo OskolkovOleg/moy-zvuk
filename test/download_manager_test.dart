@@ -10,17 +10,23 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:zvuk_personal/data/library_store.dart';
 import 'package:zvuk_personal/data/models.dart';
 import 'package:zvuk_personal/data/zvuk_api.dart';
+import 'package:zvuk_personal/data/audio_preferences.dart';
 import 'package:zvuk_personal/downloads/download_manager.dart';
 import 'package:zvuk_personal/downloads/download_record.dart';
 
 class DownloadApi extends ZvukApi {
   DownloadApi() : super('test-credential');
   int calls = 0;
+  final qualities = <AudioQuality>[];
   Completer<String>? gate;
   String url = 'https://audio.example/song';
   @override
-  Future<String> streamUrl(String id) async {
+  Future<String> streamUrl(
+    String id, {
+    AudioQuality quality = AudioQuality.high,
+  }) async {
     calls++;
+    qualities.add(quality);
     return gate == null ? '$url/$id' : await gate!.future;
   }
 }
@@ -78,6 +84,22 @@ void main() {
     );
     await manager.configure('one', api);
   });
+
+  test(
+    'New downloads use selected quality without replacing completed audio',
+    () async {
+      manager.quality = AudioQuality.economy;
+      await manager.enqueue([a]);
+      await waitDownloads(manager);
+      final original = manager.forTrack(a.id)!;
+      manager.quality = AudioQuality.high;
+      await manager.enqueue([a, b]);
+      await waitDownloads(manager);
+      expect(api.qualities, [AudioQuality.economy, AudioQuality.high]);
+      expect(manager.forTrack(a.id)!.file, original.file);
+      expect(manager.tracks.map((t) => t.id), ['a', 'b']);
+    },
+  );
   tearDown(() async {
     await manager.close();
     api.close();

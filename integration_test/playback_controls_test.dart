@@ -14,6 +14,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:zvuk_personal/data/library_store.dart';
 import 'package:zvuk_personal/data/models.dart';
 import 'package:zvuk_personal/data/zvuk_api.dart';
+import 'package:zvuk_personal/data/audio_preferences.dart';
 import 'package:zvuk_personal/playback/music_handler.dart';
 import 'package:zvuk_personal/playback/service_config.dart';
 
@@ -25,7 +26,10 @@ class ControlsApi extends ZvukApi {
   Completer<void>? gate;
   int requests = 0;
   @override
-  Future<String> streamUrl(String id) async {
+  Future<String> streamUrl(
+    String id, {
+    AudioQuality quality = AudioQuality.high,
+  }) async {
     requests++;
     final wait = gate;
     if (wait != null) await wait.future;

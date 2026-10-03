@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../data/library_store.dart';
+import '../data/audio_preferences.dart';
 import '../data/history_store.dart';
 import '../data/models.dart';
 import '../data/zvuk_api.dart';
@@ -47,6 +48,26 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
   }
   final LibraryStore store;
   final DownloadManager downloads;
+  AudioPreferences _audioPreferences = const AudioPreferences();
+  AudioPreferences get audioPreferences => _audioPreferences;
+  Future<void> _preferenceWrites = Future.value();
+
+  Future<void> setAudioPreferences(AudioPreferences preferences) {
+    final account = _account;
+    final write = _preferenceWrites.catchError((_) {}).then((_) async {
+      if (account == null || account != _account) {
+        throw const ZvukException('Аккаунт изменился. Открой настройки снова.');
+      }
+      await store.put(account, 'audioPreferences', preferences.toJson());
+      if (account != _account) return;
+      _audioPreferences = preferences;
+      downloads.quality = preferences.downloads;
+      revision.value++;
+    });
+    _preferenceWrites = write;
+    return write;
+  }
+
   Map<String, Rating> _notificationRatings = {};
 
   void setNotificationRatings(String account, Map<String, Rating> ratings) {
@@ -285,6 +306,12 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
   }
 
   Future<void> configure(String account, ZvukApi? api) async {
+    if (_account != account) {
+      _audioPreferences = AudioPreferences.fromJson(
+        await store.get(account, 'audioPreferences'),
+      );
+      downloads.quality = _audioPreferences.downloads;
+    }
     await downloads.configure(account, api);
     if (_account == account) {
       _api = api;
@@ -490,7 +517,10 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
               'Эта песня не скачана. Подключи Звук и сохрани её для прослушивания без интернета.',
             );
           }
-          final url = await api.streamUrl(track.id);
+          final url = await api.streamUrl(
+            track.id,
+            quality: _audioPreferences.streaming,
+          );
           if (generation != _generation) return;
           await player.setUrl(url, initialPosition: position);
         }

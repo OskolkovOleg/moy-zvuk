@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import 'models.dart';
+import 'audio_preferences.dart';
 import 'catalog_models.dart';
 import 'personal_models.dart';
 import 'wave_source.dart';
@@ -246,10 +247,13 @@ class ZvukApi {
     );
   }
 
-  Future<String> streamUrl(String id) async {
+  Future<String> streamUrl(
+    String id, {
+    AudioQuality quality = AudioQuality.high,
+  }) async {
     final data = await _request(
       '/api/tiny/track/stream',
-      params: {'id': id, 'quality': 'high'},
+      params: {'id': id, 'quality': quality.apiValue},
     );
     final url = data['result']?['stream'];
     final uri = url is String ? Uri.tryParse(url) : null;
