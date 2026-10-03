@@ -15,6 +15,10 @@ import 'package:zvuk_personal/playback/music_handler.dart';
 
 class UnusedMusic implements MusicHandler {
   @override
+  Future<void> Function(String account, Track track, int delta)?
+  onNotificationVote;
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
