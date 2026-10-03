@@ -74,6 +74,6 @@ Files: lib/playback/notification_controls.dart and music_handler.dart; lib/app_c
 ## Task 7: Restore system notification appearance after user feedback
 
 - [x] Restore MediaStyle for all versions, with native artwork and actions; remove ordinary RemoteViews/layout resources. Keep live score alongside artist.
-- [ ] Verify actual artwork/style/subtitle and native actions on API 30, then offline playback regression.
-- [ ] Build signed 1.10.2+17, verify eight icons/certificate/secrets, compare data and downloaded audio across signed upgrade.
-- [ ] Publish/mirror corrected release and install directly on connected phone without clearing data.
+- [x] Verify actual artwork/style/subtitle and native actions on API 30, then offline playback regression.
+- [x] Build signed 1.10.2+17, verify eight icons/certificate/secrets, compare data and downloaded audio across signed upgrade.
+- [x] Publish/mirror corrected release and install directly on connected phone without clearing data.
