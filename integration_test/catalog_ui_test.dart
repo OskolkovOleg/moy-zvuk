@@ -256,6 +256,12 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byType(CatalogTile));
       await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Альбомы и синглы'),
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
       expect(find.text('Альбомы и синглы'), findsOneWidget);
       await binding.takeScreenshot('v140-02-artist');
       await tester.tap(find.text('Новый альбом'));
@@ -264,6 +270,8 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
       await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Альбомы'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Альбомы'));
       await tester.pumpAndSettle();
