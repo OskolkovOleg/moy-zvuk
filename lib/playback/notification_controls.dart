@@ -19,11 +19,23 @@ extension _NotificationControls on MusicHandler {
         androidIcon: 'drawable/ic_rating_minus',
         label: 'Минус 1 балл',
         name: _ratingActionName(-1),
+        extras: {
+          'zvukRatingScore': trackScore(
+            playlist.current!.id,
+            _notificationRatings,
+          ),
+        },
       ),
       MediaControl.custom(
         androidIcon: 'drawable/ic_rating_plus',
         label: 'Плюс 1 балл',
         name: _ratingActionName(1),
+        extras: {
+          'zvukRatingScore': trackScore(
+            playlist.current!.id,
+            _notificationRatings,
+          ),
+        },
       ),
     ],
   ];

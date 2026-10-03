@@ -73,26 +73,25 @@ void main() {
         true,
       );
       final sdk = info['sdk'] as int;
-      if (sdk < 33) {
-        expect(info['actions'], [
-          'Previous',
-          'Pause',
-          'Next',
-          'Минус 1 балл',
-          'Плюс 1 балл',
-        ]);
-      }
+      if (sdk < 33) expect(info['hasRatingView'], true);
       expect((info['actions'] as List).contains('Stop'), false);
+      expect(info['ratingScore'], 10);
+      if (sdk < 33) expect(info['hasRatingView'], true);
       Future<void> press(String label) => bridge.invokeMethod<void>(
-        sdk < 33 ? 'notificationAction' : 'customMediaAction',
+        sdk < 33 ? 'notificationRatingAction' : 'customMediaAction',
         label,
       );
 
       // Real notification PendingIntent on older Android, MediaSession on 13+.
       await press('Плюс 1 балл');
       await clips.until(() => app.scoreFor(a) == 11);
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      expect((await notification())['ratingScore'], 11);
       expect(music.player.playing, true);
-      await bridge.invokeMethod<void>('mediaCommand', 'pause');
+      await bridge.invokeMethod<void>(
+        sdk < 33 ? 'notificationTransport' : 'mediaCommand',
+        'pause',
+      );
       await clips.until(() => !music.player.playing);
       await Future<void>.delayed(const Duration(milliseconds: 300));
       final pausedAt = music.position;
@@ -103,6 +102,8 @@ void main() {
         await press('Минус 1 балл');
       }
       await clips.until(() => app.scoreFor(a) == 12);
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      expect((await notification())['ratingScore'], 12);
       expect(music.player.playing, false);
       expect(music.position, pausedAt);
       expect(music.playlist.index, 0);

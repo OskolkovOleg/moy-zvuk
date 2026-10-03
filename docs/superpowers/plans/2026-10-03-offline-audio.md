@@ -55,3 +55,11 @@ Files: pubspec.yaml; README.md; docs/verification.md; exact changed paths mirror
 - [ ] Signed 1.9.0→new update test on emulator only, comparing existing votes/state and completed audio persistence.
 - [ ] Commit, push, confirm Ubuntu CI, publish release with verified asset digest and mirror exact changes.
 - [ ] If phone is present, signed `adb install --no-streaming -r`; preserve its data. Otherwise report that installation awaits USB.
+
+## Task 5: Live notification score (user addition)
+
+Files: lib/playback/notification_controls.dart and music_handler.dart; lib/app_controller.dart; vendored AudioService.java; android/app/src/main/res/layout/zvuk_notification_rating.xml; res/raw/keep.xml; tool/verify_apk.py; debug TestActivity.kt; notification_rating_test.dart.
+- [ ] Retain current account ratings in handler; update after app votes/undo and initial configure.
+- [ ] Publish `zvukRatingScore` extras on existing minus/plus actions; update current MediaItem artist metadata when scores change.
+- [ ] Decorated custom notification on API <33 contains minus/score/plus; include three transport controls in that view. Android 13+ keeps standard MediaSession layout and live subtitle score.
+- [ ] Verify real RemoteViews clicks and MediaSession actions, immediate 10→11→12 score updates without playback disruption, account/track changes, stale actions, native resources and actual screenshots.

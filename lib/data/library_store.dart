@@ -21,7 +21,7 @@ class LibraryStore {
     final db = await f.openDatabase(
       location,
       options: OpenDatabaseOptions(
-        version: 1,
+        version: 2,
         onCreate: (db, _) async {
           await db.execute(
             'CREATE TABLE votes (account TEXT NOT NULL, id TEXT NOT NULL, track TEXT NOT NULL, delta INTEGER NOT NULL CHECK(delta IN (-1,1)), created TEXT NOT NULL, undone INTEGER NOT NULL DEFAULT 0 CHECK(undone IN (0,1)), metadata TEXT NOT NULL, PRIMARY KEY(account,id))',
@@ -30,11 +30,19 @@ class LibraryStore {
           await db.execute(
             'CREATE TABLE state (account TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY(account,key))',
           );
+          await _createDownloads(db);
+        },
+        onUpgrade: (db, oldVersion, _) async {
+          if (oldVersion < 2) await _createDownloads(db);
         },
       ),
     );
     return LibraryStore(db);
   }
+
+  static Future<void> _createDownloads(Database db) => db.execute(
+    'CREATE TABLE downloads (account TEXT NOT NULL, track TEXT NOT NULL, metadata TEXT NOT NULL, file TEXT NOT NULL, state TEXT NOT NULL, bytes INTEGER NOT NULL, created TEXT NOT NULL, error TEXT, PRIMARY KEY(account,track))',
+  );
 
   Future<String> vote(String account, Track track, int delta) async {
     if (delta != -1 && delta != 1) {

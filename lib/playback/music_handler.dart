@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:audio_service/audio_service.dart';
+import 'package:audio_service/audio_service.dart' hide Rating;
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
@@ -11,6 +11,7 @@ import '../data/models.dart';
 import '../data/zvuk_api.dart';
 import '../data/wave_source.dart';
 import '../data/wave_options.dart';
+import '../downloads/download_manager.dart';
 import 'playback_queue.dart';
 import 'wave_buffer.dart';
 import 'sleep_timer.dart';
@@ -20,7 +21,7 @@ part 'notification_controls.dart';
 part 'wave_preferences.dart';
 
 class MusicHandler extends BaseAudioHandler with SeekHandler {
-  MusicHandler(this.store) {
+  MusicHandler(this.store) : downloads = DownloadManager(store) {
     player.playbackEventStream.listen(
       (_) => _broadcast(),
       onError: (Object _, StackTrace _) {
@@ -45,6 +46,18 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     });
   }
   final LibraryStore store;
+  final DownloadManager downloads;
+  Map<String, Rating> _notificationRatings = {};
+
+  void setNotificationRatings(String account, Map<String, Rating> ratings) {
+    if (_account != account) return;
+    _notificationRatings = Map.of(ratings);
+    if (playlist.current != null) {
+      mediaItem.add(_item(playlist.current!, playlist.index));
+    }
+    _broadcast();
+  }
+
   final player = AudioPlayer();
   final playlist = PlaybackQueue();
   final error = ValueNotifier<String?>(null);
@@ -272,6 +285,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
   }
 
   Future<void> configure(String account, ZvukApi? api) async {
+    await downloads.configure(account, api);
     if (_account == account) {
       _api = api;
       return;
@@ -283,6 +297,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     await player.stop();
     _api = api;
     _account = account;
+    _notificationRatings = await store.ratings(account);
     _loaded = false;
     _historyRecorded = false;
     playlist.replace([], 0);
@@ -333,7 +348,11 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
   MediaItem _item(Track t, int index) => MediaItem(
     id: '${t.id}:$index',
     title: t.title,
-    artist: t.artists,
+    artist:
+        '${t.artists.isEmpty ? '' : '${t.artists} · '}Баллы: ${trackScore(t.id, _notificationRatings)}',
+    displayTitle: t.title,
+    displaySubtitle:
+        '${t.artists.isEmpty ? '' : '${t.artists} · '}Баллы: ${trackScore(t.id, _notificationRatings)}',
     duration: Duration(seconds: t.duration),
     artUri: t.imageUrl == null ? null : Uri.tryParse(t.imageUrl!),
     extras: {'trackId': t.id},
@@ -437,7 +456,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
   Future<void> _loadAndPlay({bool autoplay = true}) {
     final generation = ++_generation;
     final track = playlist.current;
-    final api = _api;
+    final api = _api, account = _account;
     _loaded = false;
     _historyRecorded = false;
     _loading = track != null && autoplay;
@@ -459,14 +478,22 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
         return;
       }
       try {
-        if (api == null) {
-          throw const ZvukException(
-            'Обнови подключение в настройках, чтобы слушать музыку.',
-          );
-        }
-        final url = await api.streamUrl(track.id);
+        final local = account == null
+            ? null
+            : await downloads.localPath(account, track.id);
         if (generation != _generation) return;
-        await player.setUrl(url, initialPosition: position);
+        if (local != null) {
+          await player.setFilePath(local, initialPosition: position);
+        } else {
+          if (api == null) {
+            throw const ZvukException(
+              'Эта песня не скачана. Подключи Звук и сохрани её для прослушивания без интернета.',
+            );
+          }
+          final url = await api.streamUrl(track.id);
+          if (generation != _generation) return;
+          await player.setUrl(url, initialPosition: position);
+        }
         if (generation != _generation) return;
         _loaded = true;
         _loading = false;
@@ -675,6 +702,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     await stop();
     _cancelWave();
     await player.dispose();
+    await downloads.close();
     await _historyWrite;
     error.dispose();
     revision.dispose();

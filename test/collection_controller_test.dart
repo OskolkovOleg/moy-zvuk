@@ -19,6 +19,9 @@ class UnusedMusic implements MusicHandler {
   onNotificationVote;
 
   @override
+  void setNotificationRatings(String account, Map<String, Rating> ratings) {}
+
+  @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 

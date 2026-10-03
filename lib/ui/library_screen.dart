@@ -7,6 +7,8 @@ import 'saved_catalog_screen.dart';
 import 'history_screen.dart';
 import 'widgets.dart';
 import 'shuffle_sheet.dart';
+import 'downloads_screen.dart';
+import 'download_widgets.dart';
 
 class LibraryScreen extends StatelessWidget {
   const LibraryScreen(this.app, {super.key, this.onSettings});
@@ -114,6 +116,7 @@ class LibraryScreen extends StatelessWidget {
                           onPressed: onSettings,
                           icon: const Icon(Icons.tune_rounded, size: 22),
                         ),
+                      DownloadListButton(app, tracks, compact: true),
                       IconButton(
                         tooltip: 'Обновить библиотеку',
                         onPressed: app.busy ? null : app.refresh,
@@ -127,6 +130,21 @@ class LibraryScreen extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Row(
                     children: [
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ActionChip(
+                          avatar: const Icon(
+                            Icons.download_for_offline_outlined,
+                            size: 18,
+                          ),
+                          label: const Text('Скачанное'),
+                          onPressed: () => Navigator.of(context).push<void>(
+                            MaterialPageRoute(
+                              builder: (_) => DownloadsScreen(app),
+                            ),
+                          ),
+                        ),
+                      ),
                       for (final kind in [
                         CatalogKind.album,
                         CatalogKind.artist,

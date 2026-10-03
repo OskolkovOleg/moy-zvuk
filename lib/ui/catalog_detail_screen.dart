@@ -7,6 +7,7 @@ import '../data/models.dart';
 import 'catalog_widgets.dart';
 import 'widgets.dart';
 import 'radio_actions.dart';
+import 'download_widgets.dart';
 import '../data/wave_source.dart';
 
 class CatalogDetailScreen extends StatefulWidget {
@@ -241,6 +242,7 @@ class _CatalogDetailScreenState extends State<CatalogDetailScreen> {
                                   icon: const Icon(Icons.sensors_rounded),
                                   label: const Text('Слушать похожее'),
                                 ),
+                                DownloadListButton(app, data.tracks),
                                 if (data.item.kind == CatalogKind.album ||
                                     data.item.kind == CatalogKind.artist)
                                   OutlinedButton.icon(

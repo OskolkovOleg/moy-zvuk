@@ -9,6 +9,8 @@ import 'widgets.dart';
 import 'lyrics_screen.dart';
 import 'radio_actions.dart';
 import '../data/wave_source.dart';
+import '../downloads/download_record.dart';
+import 'download_widgets.dart';
 
 Future<void> openTrackActions(
   BuildContext context,
@@ -16,6 +18,8 @@ Future<void> openTrackActions(
   Track track, {
   Future<void> Function()? remove,
 }) async {
+  final downloads = app.music.downloads;
+  final saved = downloads.forTrack(track.id);
   final value = await showModalBottomSheet<String>(
     context: context,
     showDragHandle: true,
@@ -31,6 +35,19 @@ Future<void> openTrackActions(
               subtitle: Text(track.artists),
             ),
             for (final action in <(String, IconData, String)>[
+              (
+                'download',
+                saved?.state == DownloadState.ready
+                    ? Icons.download_done_rounded
+                    : saved?.active == true
+                    ? Icons.close_rounded
+                    : Icons.download_rounded,
+                saved?.state == DownloadState.ready
+                    ? 'Удалить скачанный файл'
+                    : saved?.active == true
+                    ? 'Отменить скачивание'
+                    : 'Скачать для прослушивания без интернета',
+              ),
               ('next', Icons.playlist_play_rounded, 'Следующим'),
               ('last', Icons.playlist_add_rounded, 'В конец очереди'),
               ('radio', Icons.sensors_rounded, 'Поток по песне'),
@@ -72,6 +89,13 @@ Future<void> openTrackActions(
   if (value == null || !context.mounted) return;
   try {
     switch (value) {
+      case 'download':
+        final current = downloads.forTrack(track.id);
+        if (current?.state == DownloadState.ready || current?.active == true) {
+          await downloads.remove(track.id);
+        } else {
+          if (context.mounted) await downloadTracks(context, app, [track]);
+        }
       case 'radio':
       case 'similar':
         await openRadioAction(

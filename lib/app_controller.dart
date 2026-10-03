@@ -314,6 +314,7 @@ class AppController extends ChangeNotifier {
     final updated = await store.ratings(id);
     if (account?.id == id) {
       ratings = updated;
+      music.setNotificationRatings(id, ratings);
       // Keep the song visible after its first vote rather than hiding it in
       // the unrated-only view. Votes never alter library membership or queue.
       unrated = false;
@@ -326,6 +327,7 @@ class AppController extends ChangeNotifier {
     await store.undo(accountId, event);
     if (account?.id == accountId) {
       ratings = await store.ratings(accountId);
+      music.setNotificationRatings(accountId, ratings);
       notifyListeners();
     }
   }

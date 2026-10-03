@@ -25,3 +25,7 @@ MusicHandler owns the downloader and configures it with its account/API. Source 
 ## Validation and delivery
 
 Test SQLite v1→v2 preservation, restart persistence, account isolation, cancellation, queue deduplication, malicious/partial HTTP responses, byte limits, storage cleanup and retry. Android emulator tests download known WAV fixtures, stop the source server, recreate the handler, then exercise local seek/next/natural completion and system media controls. Inspect UI at 320×568 and larger text. Verify signed update from 1.9.0 preserves existing rows and downloads. Run regression suite, format/analyze, Ubuntu CI, signed release and secret scan. Install directly over the phone's app if it is connected; never uninstall or integration-test the physical phone.
+
+## Accepted addition: notification score
+
+Show live score after votes from both app and notification, including offline/background playback. Android 7–12 expanded notification uses a decorated custom notification with a genuine minus / score / plus row and the three transport controls in that view. Android 13+ system media cards control their own layout; keep their five controls and put the live score in artist metadata. Carry the score in existing custom-action extras so native equality triggers a refresh; action identities retain stale track/account guards. Verify real custom-view PendingIntents on API 30 and MediaSession actions on API 36. Keep runtime resources after release shrinking.

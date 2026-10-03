@@ -4,6 +4,7 @@ import '../app_controller.dart';
 import '../data/models.dart';
 import 'track_actions.dart';
 import 'artist_navigation.dart';
+import '../downloads/download_record.dart';
 export 'track_actions.dart' show openTrackActions;
 
 String timeLabel(Duration time) =>
@@ -236,6 +237,7 @@ class TrackTile extends StatelessWidget {
     this.orderLength,
     this.catalog = false,
     this.onActions,
+    this.showRatings,
   });
   final Track track;
   final AppController app;
@@ -243,10 +245,11 @@ class TrackTile extends StatelessWidget {
   final int? orderIndex, orderLength;
   final bool catalog;
   final VoidCallback? onActions;
+  final bool? showRatings;
   @override
-  Widget build(BuildContext context) => ValueListenableBuilder<int>(
-    valueListenable: app.music.revision,
-    builder: (context, _, _) {
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: Listenable.merge([app.music.revision, app.music.downloads]),
+    builder: (context, _) {
       final current = app.music.playlist.current?.id == track.id;
       final scheme = Theme.of(context).colorScheme;
       final manual = orderIndex != null && !app.ranked;
@@ -272,6 +275,27 @@ class TrackTile extends StatelessWidget {
                         alignment: Alignment.bottomRight,
                         children: [
                           Artwork(track, size: 48),
+                          if (app.music.downloads.forTrack(track.id)?.state ==
+                              DownloadState.ready)
+                            Positioned(
+                              top: 0,
+                              right: 0,
+                              child: Tooltip(
+                                message: 'Скачано',
+                                child: Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: BoxDecoration(
+                                    color: scheme.surface,
+                                    borderRadius: BorderRadius.circular(5),
+                                  ),
+                                  child: Icon(
+                                    Icons.download_done_rounded,
+                                    size: 14,
+                                    color: scheme.primary,
+                                  ),
+                                ),
+                              ),
+                            ),
                           if (current)
                             Container(
                               padding: const EdgeInsets.all(2),
@@ -323,7 +347,7 @@ class TrackTile extends StatelessWidget {
                 ),
               ),
             ),
-            if (app.ranked && !catalog)
+            if ((showRatings ?? app.ranked) && !catalog)
               RatingControls(
                 compact: true,
                 score: app.scoreFor(track),
