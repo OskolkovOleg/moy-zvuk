@@ -46,6 +46,8 @@ Files: lib/ui/wave_settings.dart, discover_screen.dart, artist_navigation.dart, 
 
 ## 4. Deliver
 
-- [ ] Analyze/format/core, focused new UI/playback/live read-only probes and notification regression as needed.
-- [ ] Signed APK, eight resources/signature/secret checks and 1.8.2→1.9 update fixture; record actual evidence.
-- [ ] Commit/push/CI, release, mirror exact changed paths while preserving private docs. Phone install and cold launch if connected.
+- [x] Analyze/format/core, focused new UI/playback/live read-only probes and notification regression as needed.
+- [x] Signed APK, eight resources/signature/secret checks and 1.8.2→1.9 update fixture; record actual evidence.
+- [x] Commit/push/CI, release, mirror exact changed paths while preserving private docs. Phone install and cold launch if connected.
+
+**Result:** 1.9.0 built and signed; UI, 69 Android checks, live reads, CI and signed update passed. Public release and mirror completed. Physical phone absent; 1.8.2 remains last confirmed installation. See docs/verification.md.
