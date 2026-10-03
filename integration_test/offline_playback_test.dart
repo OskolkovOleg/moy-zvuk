@@ -92,9 +92,15 @@ void main() {
         expect(info['foreground'], true);
         expect(info['title'], 'Офлайн второй');
         expect(info['ratingScore'], 10);
-        await bridge.invokeMethod<void>('mediaCommand', 'pause');
+        await bridge.invokeMethod<void>(
+          info['sdk'] as int < 33 ? 'notificationTransport' : 'mediaCommand',
+          'pause',
+        );
         await clips.until(() => !music.player.playing);
-        await bridge.invokeMethod<void>('mediaCommand', 'play');
+        await bridge.invokeMethod<void>(
+          info['sdk'] as int < 33 ? 'notificationTransport' : 'mediaCommand',
+          'play',
+        );
         await clips.until(() => music.player.playing);
         await bridge.invokeMethod<void>(
           info['sdk'] as int < 33
@@ -110,7 +116,10 @@ void main() {
         expect(requests, 2);
         await music.playList(songs, 0);
         await clips.until(() => music.player.playing && !music.loading);
-        await bridge.invokeMethod<void>('mediaCommand', 'next');
+        await bridge.invokeMethod<void>(
+          info['sdk'] as int < 33 ? 'notificationTransport' : 'mediaCommand',
+          'next',
+        );
         await clips.until(
           () =>
               music.playlist.index == 1 &&
