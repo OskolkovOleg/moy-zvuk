@@ -105,7 +105,7 @@ class MiniPlayer extends StatelessWidget {
                 PlayButton(app, compact: true),
                 IconButton(
                   tooltip: 'Следующий трек',
-                  onPressed: music.playlist.hasNext ? music.skipToNext : null,
+                  onPressed: music.canSkipNext ? music.skipToNext : null,
                   icon: const Icon(Icons.skip_next_rounded, size: 27),
                 ),
                 const SizedBox(width: 4),
@@ -411,7 +411,7 @@ class _PlayerSheetState extends State<PlayerSheet> {
                                     IconButton(
                                       tooltip: 'Следующий трек',
                                       iconSize: 36,
-                                      onPressed: music.playlist.hasNext
+                                      onPressed: music.canSkipNext
                                           ? music.skipToNext
                                           : null,
                                       icon: const Icon(Icons.skip_next_rounded),
@@ -532,7 +532,7 @@ class _PlayerSheetState extends State<PlayerSheet> {
                                                 CrossAxisAlignment.start,
                                             children: [
                                               Text(
-                                                music.playlist.hasNext
+                                                music.canSkipNext
                                                     ? 'Далее'
                                                     : 'Последняя песня',
                                                 style: TextStyle(
@@ -543,7 +543,7 @@ class _PlayerSheetState extends State<PlayerSheet> {
                                               ),
                                               const SizedBox(height: 3),
                                               Text(
-                                                music.playlist.hasNext
+                                                music.canSkipNext
                                                     ? music
                                                           .playlist
                                                           .tracks[music

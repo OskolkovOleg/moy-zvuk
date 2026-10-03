@@ -9,6 +9,7 @@ import '../data/library_store.dart';
 import '../data/models.dart';
 import '../data/zvuk_api.dart';
 import 'playback_queue.dart';
+import 'wave_buffer.dart';
 
 class MusicHandler extends BaseAudioHandler with SeekHandler {
   MusicHandler(this.store) {
@@ -35,7 +36,99 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
   final error = ValueNotifier<String?>(null);
   final revision = ValueNotifier<int>(0);
   String sourceTitle = 'Очередь';
-  bool isShuffled = false;
+  bool isShuffled = false, isWave = false;
+  final _wave = WaveBuffer();
+  int _waveGeneration = 0;
+  Future<void>? _fillingWave;
+  bool _waitingNext = false;
+  bool get canSkipNext => playlist.hasNext || isWave;
+
+  void _cancelWave() {
+    _waveGeneration++;
+    _wave.cancel();
+    _fillingWave = null;
+    _waitingNext = false;
+    isWave = false;
+  }
+
+  Future<void> startWave() async {
+    _cancelWave();
+    await pause();
+    final generation = _generation;
+    final waveGeneration = _waveGeneration;
+    final api = _api;
+    if (api == null) return;
+    _loading = true;
+    error.value = null;
+    _broadcast();
+    try {
+      final tracks = await _wave.load(() => api.personalWave(), {});
+      if (generation != _generation || waveGeneration != _waveGeneration) {
+        return;
+      }
+      if (tracks.isEmpty) {
+        throw const ZvukException(
+          'Поток пока не подобрал музыку. Попробуй ещё раз.',
+        );
+      }
+      isWave = true;
+      isShuffled = false;
+      sourceTitle = 'Мой поток';
+      playlist.replace(tracks, 0);
+      _restoredPosition = Duration.zero;
+      _publishQueue();
+      await _loadAndPlay();
+    } catch (e) {
+      if (generation == _generation) {
+        _loading = false;
+        error.value = e is ZvukException
+            ? e.message
+            : 'Поток не загрузился. Попробуй снова.';
+        _broadcast();
+      }
+    }
+  }
+
+  Future<void> _fillWave() {
+    if (!isWave || _api == null) return Future.value();
+    if (_fillingWave != null) return _fillingWave!;
+    final generation = _waveGeneration, api = _api!;
+    final recent = playlist.tracks.reversed.take(200).map((t) => t.id).toSet();
+    late final Future<void> request;
+    request =
+        (() async {
+          final tracks = await _wave.load(() => api.personalWave(), recent);
+          if (!isWave || generation != _waveGeneration) return;
+          for (final track in tracks) {
+            playlist.enqueue(track);
+          }
+          // Keep a useful back history without growing the Android media queue forever.
+          if (playlist.index > 200) {
+            final remove = playlist.index - 100;
+            playlist.replace(
+              playlist.tracks.sublist(remove),
+              playlist.index - remove,
+            );
+          }
+          _publishQueue();
+          await _saveSafely();
+        })().whenComplete(() {
+          if (identical(_fillingWave, request)) _fillingWave = null;
+        });
+    _fillingWave = request;
+    return request;
+  }
+
+  void _prefetchWave() {
+    if (isWave && playlist.tracks.length - playlist.index <= 4) {
+      unawaited(
+        _fillWave().catchError((_) {
+          /* Next retries without interrupting audio. */
+        }),
+      );
+    }
+  }
+
   late final Timer _timer;
   ZvukApi? _api;
   String? _account;
@@ -73,6 +166,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     }
     ++_generation;
     await pause();
+    _cancelWave();
     await player.stop();
     _api = api;
     _account = account;
@@ -87,6 +181,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
         playlist.restore(saved);
         sourceTitle = saved['title'] as String? ?? 'Очередь';
         isShuffled = saved['shuffled'] == true;
+        isWave = saved['wave'] == true;
         _restoredPosition = Duration(
           milliseconds: saved['position'] as int? ?? 0,
         );
@@ -161,6 +256,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
         ...playlist.toJson(),
         'title': sourceTitle,
         'shuffled': isShuffled,
+        'wave': isWave,
         'position':
             (_loaded ? player.position : _restoredPosition).inMilliseconds,
       });
@@ -183,6 +279,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     String title = 'Очередь',
     bool shuffled = false,
   }) async {
+    _cancelWave();
     playlist.replace(tracks, index);
     sourceTitle = title;
     isShuffled = shuffled;
@@ -245,6 +342,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
         }
       }
     });
+    _prefetchWave();
     return _pending;
   }
 
@@ -302,6 +400,37 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
 
   @override
   Future<void> skipToNext() async {
+    if (_waitingNext) return;
+    if (!playlist.hasNext && isWave) {
+      _waitingNext = true;
+      final generation = _generation;
+      final waveGeneration = _waveGeneration;
+      _loading = true;
+      _broadcast();
+      try {
+        await _fillWave();
+        if (generation != _generation || waveGeneration != _waveGeneration) {
+          return;
+        }
+        if (!playlist.hasNext) {
+          throw const ZvukException(
+            'Поток пока не подобрал новые песни. Нажми «Следующая» ещё раз.',
+          );
+        }
+      } catch (e) {
+        if (generation == _generation) {
+          await pause();
+          error.value = e is ZvukException ? e.message : 'Не удалось продолжить поток. Проверь интернет и нажми «Следующая».';
+        }
+        return;
+      } finally {
+        if (waveGeneration == _waveGeneration) _waitingNext = false;
+        if (generation == _generation) {
+          _loading = false;
+          _broadcast();
+        }
+      }
+    }
     if (!playlist.advance()) {
       await pause();
       return;
@@ -337,7 +466,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
   Future<void> _complete() async {
     _advancing = true;
     try {
-      if (playlist.hasNext) {
+      if (canSkipNext) {
         await skipToNext();
       } else {
         await pause();
@@ -350,6 +479,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
   Future<void> disposeHandler() async {
     _timer.cancel();
     await stop();
+    _cancelWave();
     await player.dispose();
     error.dispose();
     revision.dispose();

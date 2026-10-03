@@ -186,79 +186,85 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.all(24),
-    children: [
-      Text('Подключение', style: Theme.of(context).textTheme.headlineSmall),
-      const SizedBox(height: 12),
-      Text(
-        widget.app.account?.name ?? 'Мой аккаунт',
-        style: Theme.of(context).textTheme.titleMedium,
-      ),
-      Text(
-        'ID ${widget.app.account?.id ?? ''}',
-        style: Theme.of(context).textTheme.bodySmall,
-      ),
-      const SizedBox(height: 20),
-      ExpansionTile(
-        tilePadding: EdgeInsets.zero,
-        title: const Text('Заменить токен'),
-        childrenPadding: const EdgeInsets.only(top: 12, bottom: 12),
-        children: [
-          ConnectForm(
-            widget.app,
-            onConnected: () => notify(context, 'Подключение обновлено'),
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: widget.app,
+    builder: (context, _) => ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        Text('Подключение', style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 12),
+        Text(
+          widget.app.account?.name ?? 'Мой аккаунт',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        Text(
+          'ID ${widget.app.account?.id ?? ''}',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 20),
+        ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          title: const Text('Заменить токен'),
+          childrenPadding: const EdgeInsets.only(top: 12, bottom: 12),
+          children: [
+            ConnectForm(
+              widget.app,
+              onConnected: () => notify(context, 'Подключение обновлено'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 32),
+        Text(
+          'Порядок и оценки',
+          style: Theme.of(context).textTheme.headlineSmall,
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'Копия содержит порядок списков и оценки. При восстановлении уже настроенный порядок остаётся, а повторные оценки пропускаются.',
+        ),
+        const SizedBox(height: 20),
+        FilledButton.tonalIcon(
+          onPressed: transferring ? null : exportBackup,
+          icon: const Icon(Icons.ios_share_rounded),
+          label: const Padding(
+            padding: EdgeInsets.all(12),
+            child: Text('Сохранить в файл'),
           ),
-        ],
-      ),
-      const SizedBox(height: 32),
-      Text(
-        'Порядок и оценки',
-        style: Theme.of(context).textTheme.headlineSmall,
-      ),
-      const SizedBox(height: 12),
-      const Text(
-        'Копия содержит порядок списков и оценки. При восстановлении уже настроенный порядок остаётся, а повторные оценки пропускаются.',
-      ),
-      const SizedBox(height: 20),
-      FilledButton.tonalIcon(
-        onPressed: transferring ? null : exportBackup,
-        icon: const Icon(Icons.ios_share_rounded),
-        label: const Padding(
-          padding: EdgeInsets.all(12),
-          child: Text('Сохранить в файл'),
         ),
-      ),
-      const SizedBox(height: 10),
-      OutlinedButton.icon(
-        onPressed: transferring ? null : importBackup,
-        icon: const Icon(Icons.file_open_outlined),
-        label: const Padding(
-          padding: EdgeInsets.all(12),
-          child: Text('Восстановить из файла'),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          onPressed: transferring ? null : importBackup,
+          icon: const Icon(Icons.file_open_outlined),
+          label: const Padding(
+            padding: EdgeInsets.all(12),
+            child: Text('Восстановить из файла'),
+          ),
         ),
-      ),
-      if (transferring)
-        const Padding(
-          padding: EdgeInsets.all(16),
-          child: LinearProgressIndicator(),
+        if (transferring)
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: LinearProgressIndicator(),
+          ),
+        const SizedBox(height: 36),
+        Text(
+          'Мой Звук · 1.4.0',
+          style: Theme.of(context).textTheme.titleMedium,
         ),
-      const SizedBox(height: 36),
-      Text('Мой Звук · 1.3.0', style: Theme.of(context).textTheme.titleMedium),
-      const SizedBox(height: 8),
-      Text(
-        'Личное неофициальное приложение. Порядок и оценки хранятся на телефоне. Воспроизведение требует интернета и доступа к треку в Звуке.',
-        style: Theme.of(context).textTheme.bodySmall,
-      ),
-      const SizedBox(height: 12),
-      TextButton(
-        onPressed: () => showLicensePage(
-          context: context,
-          applicationName: 'Мой Звук',
-          applicationVersion: '1.3.0',
+        const SizedBox(height: 8),
+        Text(
+          'Личное неофициальное приложение. Порядок и оценки хранятся на телефоне. Воспроизведение требует интернета и доступа к треку в Звуке.',
+          style: Theme.of(context).textTheme.bodySmall,
         ),
-        child: const Text('Лицензии компонентов'),
-      ),
-    ],
+        const SizedBox(height: 12),
+        TextButton(
+          onPressed: () => showLicensePage(
+            context: context,
+            applicationName: 'Мой Звук',
+            applicationVersion: '1.4.0',
+          ),
+          child: const Text('Лицензии компонентов'),
+        ),
+      ],
+    ),
   );
 }

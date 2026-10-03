@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../app_controller.dart';
 import '../data/models.dart';
+import 'track_actions.dart';
+export 'track_actions.dart' show openTrackActions;
 
 String scoreLabel(int score) => score > 0 ? '+$score' : '$score';
 String timeLabel(Duration time) =>
@@ -233,82 +235,11 @@ class TrackMenu extends StatelessWidget {
   final AppController app;
   final Track track;
   @override
-  Widget build(BuildContext context) => PopupMenuButton<String>(
+  Widget build(BuildContext context) => IconButton(
     tooltip: 'Действия: ${track.title}',
     icon: const Icon(Icons.more_horiz_rounded),
-    onSelected: (value) async {
-      try {
-        await app.music.enqueueTrack(track, next: value == 'next');
-        if (context.mounted) {
-          notify(
-            context,
-            value == 'next' ? 'Будет следующей' : 'Добавлено в конец очереди',
-          );
-        }
-      } catch (_) {
-        if (context.mounted) notify(context, 'Не удалось сохранить очередь.');
-      }
-    },
-    itemBuilder: (_) => const [
-      PopupMenuItem(
-        value: 'next',
-        child: ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: Icon(Icons.playlist_play_rounded),
-          title: Text('Следующим'),
-        ),
-      ),
-      PopupMenuItem(
-        value: 'last',
-        child: ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: Icon(Icons.playlist_add_rounded),
-          title: Text('В конец очереди'),
-        ),
-      ),
-    ],
+    onPressed: () => openTrackActions(context, app, track),
   );
-}
-
-Future<void> openTrackActions(
-  BuildContext context,
-  AppController app,
-  Track track,
-) async {
-  final value = await showModalBottomSheet<String>(
-    context: context,
-    showDragHandle: true,
-    builder: (sheetContext) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(title: Text(track.title), subtitle: Text(track.artists)),
-          ListTile(
-            leading: const Icon(Icons.playlist_play_rounded),
-            title: const Text('Следующим'),
-            onTap: () => Navigator.pop(sheetContext, 'next'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.playlist_add_rounded),
-            title: const Text('В конец очереди'),
-            onTap: () => Navigator.pop(sheetContext, 'last'),
-          ),
-        ],
-      ),
-    ),
-  );
-  if (value == null) return;
-  try {
-    await app.music.enqueueTrack(track, next: value == 'next');
-    if (context.mounted) {
-      notify(
-        context,
-        value == 'next' ? 'Будет следующей' : 'Добавлено в конец очереди',
-      );
-    }
-  } catch (_) {
-    if (context.mounted) notify(context, 'Не удалось сохранить очередь.');
-  }
 }
 
 class TrackTile extends StatelessWidget {
@@ -319,11 +250,15 @@ class TrackTile extends StatelessWidget {
     required this.onPlay,
     this.orderIndex,
     this.orderLength,
+    this.catalog = false,
+    this.onActions,
   });
   final Track track;
   final AppController app;
   final VoidCallback onPlay;
   final int? orderIndex, orderLength;
+  final bool catalog;
+  final VoidCallback? onActions;
   @override
   Widget build(BuildContext context) => ValueListenableBuilder<int>(
     valueListenable: app.music.revision,
@@ -343,7 +278,8 @@ class TrackTile extends StatelessWidget {
               child: InkWell(
                 borderRadius: BorderRadius.circular(12),
                 onTap: onPlay,
-                onLongPress: () => openTrackActions(context, app, track),
+                onLongPress:
+                    onActions ?? () => openTrackActions(context, app, track),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(4, 4, 0, 4),
                   child: Row(
@@ -404,7 +340,7 @@ class TrackTile extends StatelessWidget {
                 ),
               ),
             ),
-            if (app.ranked)
+            if (app.ranked && !catalog)
               RatingControls(
                 compact: true,
                 score: app.scoreFor(track),
@@ -422,7 +358,14 @@ class TrackTile extends StatelessWidget {
                       ? () => moveWithFeedback(context, app, orderIndex!, 1)
                       : null,
                 ),
-              TrackMenu(app, track),
+              if (onActions != null)
+                IconButton(
+                  tooltip: 'Действия: ${track.title}',
+                  onPressed: onActions,
+                  icon: const Icon(Icons.more_horiz_rounded),
+                )
+              else
+                TrackMenu(app, track),
             ],
           ],
         ),

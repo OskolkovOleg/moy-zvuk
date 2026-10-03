@@ -5,6 +5,9 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import 'models.dart';
+import 'catalog_models.dart';
+
+part 'catalog_api.dart';
 
 class ZvukException implements Exception {
   const ZvukException(this.message, {this.auth = false});
@@ -21,7 +24,7 @@ class ZvukApi {
   final http.Client _client;
   final Map<String, Cookie> _cookies = {};
   static const _fields =
-      'id title duration artists { title } release { image { src } }';
+      'id title duration artists { id title } release { id image { src } }';
   void close() => _client.close();
 
   Future<Map<String, dynamic>> _request(
@@ -167,7 +170,9 @@ class ZvukApi {
         'query getTracks(\$ids: [ID!]!) { getTracks(ids: \$ids) { $_fields } }',
         {'ids': batch},
       );
-      for (final item in data['getTracks'] as List? ?? []) {
+      for (final item
+          in (data['getTracks'] as List? ?? [])
+              .whereType<Map<String, dynamic>>()) {
         final track = Track.fromApi(item);
         found[track.id] = track;
       }
@@ -196,35 +201,26 @@ class ZvukApi {
     final ids = (data['collection']['playlists'] as List)
         .map((e) => e['id'].toString())
         .toList();
-    final found = <String, PlaylistInfo>{};
-    for (var start = 0; start < ids.length; start += 50) {
-      final batch = ids.sublist(start, (start + 50).clamp(0, ids.length));
-      final result = await _graph(
-        'getShortPlaylist',
-        r'query getShortPlaylist($ids: [ID!]!) { getPlaylists(ids: $ids) { id title } }',
-        {'ids': batch},
-      );
-      for (final item in result['getPlaylists'] as List) {
-        final p = PlaylistInfo.fromJson(item);
-        found[p.id] = p;
-      }
-    }
-    return ids.where(found.containsKey).map((id) => found[id]!).toList();
+    return getPlaylists(ids);
   }
 
   Future<List<Track>> playlistTracks(String id) async {
     final all = <Track>[];
+    var offset = 0;
     while (true) {
       final data = await _graph(
         'getPlaylistTracks',
         'query getPlaylistTracks(\$id: ID!, \$limit: Int, \$offset: Int) { playlistTracks(id: \$id, limit: \$limit, offset: \$offset) { $_fields } }',
-        {'id': id, 'limit': 100, 'offset': all.length},
+        {'id': id, 'limit': 100, 'offset': offset},
       );
-      final batch = (data['playlistTracks'] as List)
+      final rawBatch = data['playlistTracks'] as List;
+      final batch = rawBatch
+          .whereType<Map<String, dynamic>>()
           .map((j) => Track.fromApi(j))
           .toList();
+      offset += rawBatch.length;
       all.addAll(batch);
-      if (batch.length < 100) return all;
+      if (rawBatch.length < 100) return all;
     }
   }
 

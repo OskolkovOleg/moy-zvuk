@@ -24,7 +24,14 @@ class AppController extends ChangeNotifier {
   bool busy = false, ranked = false, unrated = false, connecting = false;
   bool reordering = false;
   String? message;
-  int _selection = 0;
+  int _selection = 0, _catalogRevision = 0;
+  int libraryRequests = 0;
+  List<Track> favoriteTracks = [];
+  bool serverBusy = false;
+  Future<void> _edits = Future.value();
+  bool isFavorite(String id) => favoriteTracks.any((t) => t.id == id);
+  bool owns(PlaylistInfo p) => p.ownerId != null && p.ownerId == account?.id;
+  bool hasPlaylist(String id) => playlists.any((p) => p.id == id);
 
   int scoreFor(Track track) => trackScore(track.id, ratings);
 
@@ -115,7 +122,10 @@ class AppController extends ChangeNotifier {
 
   Future<void> _loadCache() async {
     final id = account!.id;
-    tracks = await store.loadTracks(id, listId);
+    favoriteTracks = await store.loadTracks(id, 'favorites');
+    tracks = listId == 'favorites'
+        ? favoriteTracks
+        : await store.loadTracks(id, listId);
     manualOrder = await store.loadOrder(id, listId);
     ranked = await store.get(id, 'sort') == 'rating';
     ratings = await store.ratings(id);
@@ -166,9 +176,10 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> refresh() async {
-    if (busy || api == null || account == null) return;
+    if (busy || serverBusy || api == null || account == null) return;
     final id = account!.id, selected = listId;
     final requestApi = api!;
+    final revision = _catalogRevision;
     final selection = _selection;
     busy = true;
     message = null;
@@ -176,13 +187,16 @@ class AppController extends ChangeNotifier {
     try {
       final favorites = await requestApi.favorites();
       final lists = await requestApi.playlists();
-      await store.saveTracks(id, 'favorites', favorites);
-      await store.put(id, 'playlists', lists.map((p) => p.toJson()).toList());
       final active = selected == 'favorites'
           ? favorites
           : await requestApi.playlistTracks(selected);
+      if (revision != _catalogRevision || account?.id != id) return;
+      await store.saveTracks(id, 'favorites', favorites);
+      await store.put(id, 'playlists', lists.map((p) => p.toJson()).toList());
       if (selected != 'favorites') await store.saveTracks(id, selected, active);
       if (account?.id == id) {
+        if (revision != _catalogRevision) return;
+        favoriteTracks = favorites;
         playlists = lists;
         if (selection == _selection) tracks = active;
       }
@@ -218,6 +232,7 @@ class AppController extends ChangeNotifier {
       await store.saveTracks(id, selected, result);
       if (selection == _selection && account?.id == id) {
         tracks = result;
+        if (selected == 'favorites') favoriteTracks = result;
         message = null;
       }
     } catch (e) {
@@ -227,6 +242,12 @@ class AppController extends ChangeNotifier {
             : 'Не удалось загрузить плейлист.';
       }
     }
+    notifyListeners();
+  }
+
+  Future<void> openLibrary(PlaylistInfo p) async {
+    await selectPlaylist(p);
+    libraryRequests++;
     notifyListeners();
   }
 
@@ -281,4 +302,170 @@ class AppController extends ChangeNotifier {
     }
     return added;
   }
+
+  Future<T> _edit<T>(Future<T> Function(ZvukApi api, String accountId) action) {
+    final session = api, id = account?.id;
+    final result = _edits.catchError((_) {}).then((_) async {
+      if (session == null ||
+          id == null ||
+          api != session ||
+          account?.id != id) {
+        throw const ZvukException('Подключение изменилось. Повтори действие.');
+      }
+      _catalogRevision++;
+      serverBusy = true;
+      notifyListeners();
+      try {
+        return await action(session, id);
+      } finally {
+        _catalogRevision++;
+        serverBusy = false;
+        notifyListeners();
+      }
+    });
+    _edits = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    return result;
+  }
+
+  Future<void> _readBack(ZvukApi session, Future<void> Function() read) async {
+    try {
+      await read();
+    } catch (_) {
+      if (api == session) message = 'Изменение сохранено в Звуке. Обнови библиотеку, когда появится интернет.';
+    }
+  }
+
+  Future<void> _listsAfterEdit(ZvukApi session, String id) async {
+    final lists = await session.playlists();
+    await store.put(id, 'playlists', lists.map((p) => p.toJson()).toList());
+    if (api == session && account?.id == id) {
+      playlists = lists;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _tracksAfterEdit(
+    ZvukApi session,
+    String id,
+    String playlistId,
+  ) async {
+    final fresh = await session.playlistTracks(playlistId);
+    await store.saveTracks(id, playlistId, fresh);
+    if (api == session && account?.id == id && listId == playlistId) {
+      tracks = fresh;
+    }
+    await _readBack(session, () => _listsAfterEdit(session, id));
+  }
+
+  Future<PlaylistInfo> _owned(ZvukApi session, String id) async {
+    final lists = await session.getPlaylists([id]);
+    if (lists.isEmpty || !owns(lists.single)) {
+      throw const ZvukException('Изменять можно только свои плейлисты.');
+    }
+    return lists.single;
+  }
+
+  Future<void> setFavorite(Track track, bool liked) => _edit((
+    session,
+    id,
+  ) async {
+    await session.setCollectionItem(track.id, liked: liked);
+    if (api == session && account?.id == id) {
+      favoriteTracks = favoriteTracks.where((t) => t.id != track.id).toList();
+      if (liked) favoriteTracks.insert(0, track);
+      if (listId == 'favorites') tracks = favoriteTracks;
+    }
+    await _readBack(session, () async {
+      final favorites = await session.favorites();
+      await store.saveTracks(id, 'favorites', favorites);
+      if (api == session && account?.id == id) {
+        favoriteTracks = favorites;
+        if (listId == 'favorites') tracks = favorites;
+      }
+    });
+  });
+
+  Future<void> savePlaylist(PlaylistInfo p, bool liked) =>
+      _edit((session, id) async {
+        await session.setCollectionItem(p.id, liked: liked, playlist: true);
+        if (api == session) {
+          playlists = playlists.where((item) => item.id != p.id).toList();
+          if (liked) playlists.add(p);
+          if (!liked && listId == p.id) await selectPlaylist(null);
+        }
+        await _readBack(session, () => _listsAfterEdit(session, id));
+      });
+
+  Future<PlaylistInfo> createPlaylist(
+    String name, {
+    List<String> trackIds = const [],
+  }) => _edit((session, id) async {
+    final created = await session.createPlaylist(
+      name.trim(),
+      trackIds: trackIds,
+    );
+    // Creation succeeds before collection refresh: avoid repeating a successful
+    // create merely because the metadata request was interrupted.
+    final p = PlaylistInfo(
+      created,
+      name.trim(),
+      ownerId: id,
+      trackCount: trackIds.length,
+    );
+    if (api == session && account?.id == id) playlists = [...playlists, p];
+    try {
+      await _readBack(session, () => _listsAfterEdit(session, id));
+    } catch (_) {
+      /* Refresh can be retried. */
+    }
+    return p;
+  });
+
+  Future<void> renamePlaylist(PlaylistInfo p, String name) =>
+      _edit((session, id) async {
+        await _owned(session, p.id);
+        await session.renamePlaylist(p.id, name.trim());
+        if (api == session && listId == p.id) listTitle = name.trim();
+        await _readBack(session, () => _listsAfterEdit(session, id));
+      });
+
+  Future<void> deletePlaylist(PlaylistInfo p) => _edit((session, id) async {
+    await _owned(session, p.id);
+    await session.deletePlaylist(p.id);
+    if (api == session) {
+      playlists = playlists.where((item) => item.id != p.id).toList();
+      if (listId == p.id) await selectPlaylist(null);
+    }
+    await _readBack(session, () => _listsAfterEdit(session, id));
+  });
+
+  Future<void> addToPlaylist(PlaylistInfo p, Track track) =>
+      _edit((session, id) async {
+        await _owned(session, p.id);
+        await session.addPlaylistTracks(p.id, [track.id]);
+        await _readBack(session, () => _tracksAfterEdit(session, id, p.id));
+      });
+
+  Future<void> removeFromPlaylist(
+    PlaylistInfo p,
+    List<Track> snapshot,
+    int index,
+  ) => _edit((session, id) async {
+    final fresh = await session.playlistTracks(p.id);
+    if (!listEquals(
+      fresh.map((t) => t.id).toList(),
+      snapshot.map((t) => t.id).toList(),
+    )) {
+      throw const ZvukException(
+        'Плейлист изменился. Обнови его перед удалением песни.',
+      );
+    }
+    final metadata = await _owned(session, p.id);
+    fresh.removeAt(index);
+    await session.replacePlaylistTracks(
+      metadata,
+      fresh.map((t) => t.id).toList(),
+    );
+    await _readBack(session, () => _tracksAfterEdit(session, id, p.id));
+  });
 }

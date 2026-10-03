@@ -5,8 +5,9 @@ import 'widgets.dart';
 import 'shuffle_sheet.dart';
 
 class LibraryScreen extends StatelessWidget {
-  const LibraryScreen(this.app, {super.key});
+  const LibraryScreen(this.app, {super.key, this.onSettings});
   final AppController app;
+  final VoidCallback? onSettings;
 
   void chooseLibrary(BuildContext context) => showModalBottomSheet(
     context: context,
@@ -103,6 +104,12 @@ class LibraryScreen extends StatelessWidget {
                         ),
                       ),
                       const Spacer(),
+                      if (onSettings != null)
+                        IconButton(
+                          tooltip: 'Настройки',
+                          onPressed: onSettings,
+                          icon: const Icon(Icons.tune_rounded, size: 22),
+                        ),
                       IconButton(
                         tooltip: 'Обновить библиотеку',
                         onPressed: app.busy ? null : app.refresh,

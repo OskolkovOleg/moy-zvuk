@@ -5,10 +5,13 @@ class Track {
     this.artists = '',
     this.duration = 0,
     this.imageUrl,
+    this.artistIds = const [],
+    this.releaseId,
   });
   final String id, title, artists;
   final int duration;
-  final String? imageUrl;
+  final String? imageUrl, releaseId;
+  final List<String> artistIds;
 
   factory Track.fromApi(Map<String, dynamic> json) => Track(
     id: json['id'].toString(),
@@ -18,6 +21,11 @@ class Track {
         .join(', '),
     duration: (json['duration'] as num? ?? 0).toInt(),
     imageUrl: artwork(json['release']?['image']?['src']),
+    releaseId: json['release']?['id']?.toString(),
+    artistIds: (json['artists'] as List? ?? [])
+        .where((a) => a['id'] != null)
+        .map((a) => a['id'].toString())
+        .toList(),
   );
   factory Track.fromJson(Map<String, dynamic> json) => Track(
     id: json['id'] as String,
@@ -25,6 +33,8 @@ class Track {
     artists: json['artists'] as String? ?? '',
     duration: json['duration'] as int? ?? 0,
     imageUrl: json['imageUrl'] as String?,
+    releaseId: json['releaseId'] as String?,
+    artistIds: (json['artistIds'] as List? ?? []).cast<String>(),
   );
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -32,6 +42,8 @@ class Track {
     'artists': artists,
     'duration': duration,
     'imageUrl': imageUrl,
+    'releaseId': releaseId,
+    'artistIds': artistIds,
   };
 }
 
@@ -46,6 +58,18 @@ String? artwork(dynamic value) {
       .toString();
 }
 
+String trackCountLabel(int count) {
+  final lastTwo = count % 100, last = count % 10;
+  final word = lastTwo >= 11 && lastTwo <= 14
+      ? 'треков'
+      : last == 1
+      ? 'трек'
+      : last >= 2 && last <= 4
+      ? 'трека'
+      : 'треков';
+  return '$count $word';
+}
+
 class Account {
   const Account(this.id, this.name);
   final String id, name;
@@ -55,11 +79,37 @@ class Account {
 }
 
 class PlaylistInfo {
-  const PlaylistInfo(this.id, this.title);
-  final String id, title;
-  factory PlaylistInfo.fromJson(Map<String, dynamic> j) =>
-      PlaylistInfo(j['id'].toString(), j['title'] as String? ?? 'Плейлист');
-  Map<String, dynamic> toJson() => {'id': id, 'title': title};
+  const PlaylistInfo(
+    this.id,
+    this.title, {
+    this.ownerId,
+    this.imageUrl,
+    this.isPublic = false,
+    this.trackCount = 0,
+    this.description = '',
+  });
+  final String id, title, description;
+  final String? ownerId, imageUrl;
+  final bool isPublic;
+  final int trackCount;
+  factory PlaylistInfo.fromJson(Map<String, dynamic> j) => PlaylistInfo(
+    j['id'].toString(),
+    j['title'] as String? ?? 'Плейлист',
+    ownerId: (j['ownerId'] ?? j['userId'])?.toString(),
+    imageUrl: j['imageUrl'] as String? ?? artwork(j['image']?['src']),
+    isPublic: j['isPublic'] == true,
+    trackCount: j['trackCount'] as int? ?? (j['tracks'] as List? ?? []).length,
+    description: j['description'] as String? ?? '',
+  );
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'ownerId': ownerId,
+    'imageUrl': imageUrl,
+    'isPublic': isPublic,
+    'trackCount': trackCount,
+    'description': description,
+  };
 }
 
 class SearchPage {

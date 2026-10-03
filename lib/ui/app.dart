@@ -8,6 +8,9 @@ import 'search_screen.dart';
 import 'settings_screen.dart';
 import 'player_sheet.dart';
 import 'theme.dart';
+import 'discover_screen.dart';
+import 'playlists_screen.dart';
+import 'catalog_widgets.dart';
 
 class ZvukApp extends StatefulWidget {
   const ZvukApp(this.app, {super.key});
@@ -17,7 +20,8 @@ class ZvukApp extends StatefulWidget {
 }
 
 class _ZvukAppState extends State<ZvukApp> with WidgetsBindingObserver {
-  int tab = 0;
+  int tab = 0, libraryRequests = 0;
+  final visited = <int>{0};
   @override
   void initState() {
     super.initState();
@@ -38,6 +42,16 @@ class _ZvukAppState extends State<ZvukApp> with WidgetsBindingObserver {
     }
   }
 
+  void settings(BuildContext context) => Navigator.of(context).push<void>(
+    MaterialPageRoute(
+      builder: (_) => PlayerScaffold(
+        widget.app,
+        title: 'Настройки',
+        body: SettingsScreen(widget.app),
+      ),
+    ),
+  );
+
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'Мой Звук',
@@ -47,19 +61,22 @@ class _ZvukAppState extends State<ZvukApp> with WidgetsBindingObserver {
       animation: widget.app,
       builder: (context, _) {
         final app = widget.app;
+        if (libraryRequests != app.libraryRequests) {
+          libraryRequests = app.libraryRequests;
+          tab = 0;
+        }
         if (app.account == null) return Scaffold(body: WelcomeScreen(app));
         return Scaffold(
           appBar: tab == 0
               ? null
               : AppBar(
-                  title: Text(['Мой Звук', 'Поиск', 'Настройки'][tab]),
+                  title: Text(['Мой Звук', 'Обзор', 'Поиск', 'Плейлисты'][tab]),
                   actions: [
-                    if (tab == 0)
-                      IconButton(
-                        tooltip: 'Обновить библиотеку',
-                        onPressed: app.busy ? null : app.refresh,
-                        icon: const Icon(Icons.refresh_rounded),
-                      ),
+                    IconButton(
+                      tooltip: 'Настройки',
+                      onPressed: () => settings(context),
+                      icon: const Icon(Icons.tune_rounded),
+                    ),
                   ],
                 ),
           body: SafeArea(
@@ -85,7 +102,7 @@ class _ZvukAppState extends State<ZvukApp> with WidgetsBindingObserver {
                         ),
                         IconButton(
                           tooltip: 'Открыть подключение',
-                          onPressed: () => setState(() => tab = 2),
+                          onPressed: () => settings(context),
                           icon: const Icon(Icons.settings_outlined),
                         ),
                       ],
@@ -95,12 +112,20 @@ class _ZvukAppState extends State<ZvukApp> with WidgetsBindingObserver {
                   child: IndexedStack(
                     index: tab,
                     children: [
-                      LibraryScreen(app),
+                      LibraryScreen(app, onSettings: () => settings(context)),
+                      visited.contains(1)
+                          ? DiscoverScreen(
+                              app,
+                              key: ValueKey(
+                                'discover:${app.account!.id}:${app.api.hashCode}',
+                              ),
+                            )
+                          : const SizedBox.shrink(),
                       SearchScreen(
                         app,
                         key: ValueKey('search:${app.account!.id}'),
                       ),
-                      SettingsScreen(app),
+                      PlaylistsScreen(app),
                     ],
                   ),
                 ),
@@ -110,7 +135,10 @@ class _ZvukAppState extends State<ZvukApp> with WidgetsBindingObserver {
           ),
           bottomNavigationBar: NavigationBar(
             selectedIndex: tab,
-            onDestinationSelected: (value) => setState(() => tab = value),
+            onDestinationSelected: (value) => setState(() {
+              tab = value;
+              visited.add(value);
+            }),
             destinations: const [
               NavigationDestination(
                 icon: Icon(Icons.library_music_outlined),
@@ -118,12 +146,17 @@ class _ZvukAppState extends State<ZvukApp> with WidgetsBindingObserver {
                 label: 'Библиотека',
               ),
               NavigationDestination(
+                icon: Icon(Icons.explore_outlined),
+                selectedIcon: Icon(Icons.explore_rounded),
+                label: 'Обзор',
+              ),
+              NavigationDestination(
                 icon: Icon(Icons.search_rounded),
                 label: 'Поиск',
               ),
               NavigationDestination(
-                icon: Icon(Icons.tune_rounded),
-                label: 'Настройки',
+                icon: Icon(Icons.queue_music_rounded),
+                label: 'Плейлисты',
               ),
             ],
           ),
