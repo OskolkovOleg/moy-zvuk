@@ -1,0 +1,2 @@
+# Keep vendored upstream formatting and collapse its unchanged source in reviews.
+third_party/audio_service/** linguist-vendored -whitespace
