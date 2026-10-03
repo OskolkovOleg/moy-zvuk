@@ -236,7 +236,7 @@ void main() {
         await type('ошибка');
         await settleSearch();
         expect(
-          MediaQuery.viewInsetsOf(tester.element(field())).bottom,
+          View.of(tester.element(field())).viewInsets.bottom,
           greaterThan(0),
         );
         expect(find.byType(MiniPlayer), findsNothing);
