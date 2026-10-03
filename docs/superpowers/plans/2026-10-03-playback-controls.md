@@ -57,6 +57,8 @@ Files: lib/ui/queue_view.dart, playback_controls.dart, player_sheet.dart; integr
 
 Files: pubspec.yaml, settings_screen.dart, README.md, docs/verification.md; integration_test/core_test.dart.
 - [x] Core tests, new playback/UI integration and background regression; formatter and analyzer.
-- [ ] Build 1.6.0 signed release; resource/signature/secret checks, upgrade fixture preserves data.
-- [ ] Commit and push; CI passes; publish APK, mirror code and preserve private verification history.
-- [ ] Install on physical phone only if it appears; otherwise report ready APK and USB limitation.
+- [x] Build 1.6.0 signed release; resource/signature/secret checks, upgrade fixture preserves data.
+- [x] Commit and push; CI passes; publish APK, mirror code and preserve private verification history.
+- [x] Install on physical phone only if it appears; otherwise report ready APK and USB limitation.
+
+**Release result:** v1.6.0 published; signed upgrade 1.5.0 → 1.6.0 preserves fixture state. Phone absent from USB, so physical installation deferred. Full evidence: docs/verification.md.
