@@ -5,6 +5,7 @@ import re
 import shutil
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 
 
 root = Path(__file__).resolve().parent.parent
@@ -48,3 +49,28 @@ missing = [name for name in required if not re.search(r'\b' + re.escape(name) + 
 if missing:
     sys.exit('Release APK is missing notification resources: ' + ', '.join(missing) + '. Check res/raw/keep.xml.')
 print(f'Release notification resources verified: {len(required)} resources')
+
+# A debug build does not exercise R8. Verify the actual release's reflective
+# entry points so a stripped ML Kit registrar cannot ship as a silent failure.
+analyzer = shutil.which('apkanalyzer')
+if not analyzer and sdk:
+    candidates = list((Path(sdk) / 'cmdline-tools').glob('*/bin/apkanalyzer'))
+    if candidates:
+        analyzer = str(sorted(candidates)[-1])
+if not analyzer:
+    sys.exit('Install Android SDK command-line tools to verify release constructors.')
+manifest = subprocess.run([analyzer, 'manifest', 'print', str(apk)], capture_output=True, text=True, check=True).stdout
+namespace = '{http://schemas.android.com/apk/res/android}'
+registrars = [
+    node.get(namespace + 'name').split(':', 1)[1]
+    for node in ET.fromstring(manifest).iter('meta-data')
+    if node.get(namespace + 'value') == 'com.google.firebase.components.ComponentRegistrar'
+    and node.get(namespace + 'name', '').startswith('com.google.firebase.components:')
+]
+if not registrars:
+    sys.exit('Release APK is missing ML Kit component metadata.')
+for registrar in registrars:
+    code = subprocess.run([analyzer, 'dex', 'code', '--class', registrar, str(apk)], capture_output=True, text=True, check=True).stdout
+    if not re.search(r'\.method public constructor <init>\(\)V', code):
+        sys.exit('Release APK is missing reflective constructor: ' + registrar)
+print(f'Release ML Kit registrar constructors verified: {len(registrars)}')
