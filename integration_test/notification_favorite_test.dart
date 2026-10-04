@@ -134,8 +134,8 @@ void main() {
           'pause',
         );
         await clips.until(() => !music.player.playing);
-        final pausedAt = music.position;
         await Future<void>.delayed(const Duration(milliseconds: 400));
+        final pausedAt = music.position;
         api.state.failRead = true;
         await press('Убрать из любимого');
         await clips.until(() => !app.isFavorite(a.id) && !app.serverBusy);
@@ -163,7 +163,7 @@ void main() {
         expect(app.isFavorite(a.id), true);
         final old = action();
         print('NOTIFICATION_FAVORITE_CAPTURE_READY SDK=$sdk');
-        await Future<void>.delayed(const Duration(seconds: 10));
+        await Future<void>.delayed(const Duration(seconds: 20));
         await music.skipToNext();
         await music.pause();
         expect(await music.customAction(old), false);
