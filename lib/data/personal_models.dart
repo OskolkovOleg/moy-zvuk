@@ -37,6 +37,35 @@ class SongLyrics {
   const SongLyrics(this.lines, {this.translation});
   final List<LyricsLine> lines;
   final String? translation;
+  Map<String, dynamic> toJson() => {
+    'lines': [
+      for (final line in lines)
+        {'text': line.text, 'at': line.at?.inMilliseconds},
+    ],
+    'translation': translation,
+  };
+  factory SongLyrics.fromJson(Map<String, dynamic> value) {
+    final rows = value['lines'];
+    if (rows is! List ||
+        rows.any(
+          (row) =>
+              row is! Map ||
+              row['text'] is! String ||
+              (row['at'] != null && row['at'] is! int),
+        )) {
+      throw const FormatException('Invalid cached lyrics');
+    }
+    return SongLyrics(
+      [
+        for (final row in rows)
+          LyricsLine(
+            row['text'],
+            row['at'] == null ? null : Duration(milliseconds: row['at']),
+          ),
+      ],
+      translation: value['translation'] is String ? value['translation'] : null,
+    );
+  }
   bool get synced => lines.isNotEmpty && lines.every((l) => l.at != null);
   int activeLine(Duration position) {
     if (!synced) return -1;

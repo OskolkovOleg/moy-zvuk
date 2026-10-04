@@ -227,3 +227,13 @@ Source: https://github.com/google/material-design-icons
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+
+Google Translate attribution badges
+Copyright Google LLC. Unaltered official attribution graphics, used under Google's branding guidelines.
+Source: https://docs.cloud.google.com/static/translate/images/google-translate-attribution.zip
+Guidelines: https://docs.cloud.google.com/translate/attribution
+ML Kit translation terms: https://developers.google.com/ml-kit/language/translation/translation-terms
+
+On-device translations are powered by Google Translate. Automatic translations may be inaccurate.
+Google disclaims warranties regarding their accuracy, reliability, fitness for a particular purpose,
+merchantability and non-infringement. The original lyrics remain the authoritative text.

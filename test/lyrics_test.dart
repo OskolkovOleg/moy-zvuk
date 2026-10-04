@@ -32,4 +32,28 @@ void main() {
     expect(lyrics.translation, 'Translation');
     expect(SongLyrics.parse(' ').lines, isEmpty);
   });
+  test('Cached lyrics preserve timing, translation and stanza boundaries', () {
+    final timed = SongLyrics.parse(
+      '[00:01.5]First\n[00:10]Second',
+      translation: 'Первая\nВторая',
+    );
+    final cached = SongLyrics.fromJson(timed.toJson());
+    expect(cached.lines.first.at, const Duration(milliseconds: 1500));
+    expect(cached.activeLine(const Duration(seconds: 10)), 1);
+    expect(cached.translation, timed.translation);
+    final plain = SongLyrics.parse('First\n\nSecond');
+    expect(SongLyrics.fromJson(plain.toJson()).lines.map((line) => line.text), [
+      'First',
+      '',
+      'Second',
+    ]);
+    expect(
+      () => SongLyrics.fromJson({
+        'lines': [
+          {'text': 'First', 'at': 'invalid'},
+        ],
+      }),
+      throwsFormatException,
+    );
+  });
 }

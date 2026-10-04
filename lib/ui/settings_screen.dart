@@ -13,6 +13,7 @@ import 'playback_controls.dart';
 import 'settings_widgets.dart';
 import 'wave_settings.dart';
 import 'widgets.dart';
+import 'translation_info.dart';
 
 class ConnectForm extends StatefulWidget {
   const ConnectForm(this.app, {super.key, this.onConnected});
@@ -446,6 +447,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 icon: Icons.music_note_rounded,
                 title: 'Мой Звук',
                 subtitle: 'Версия $appVersion',
+              ),
+              SettingsRow(
+                icon: Icons.translate_rounded,
+                title: 'Перевод текста песен',
+                subtitle: 'Английский → русский, Google Translate на телефоне',
+                onTap: () => showTranslationInfo(context),
               ),
               SettingsRow(
                 key: const Key('settings-licenses'),

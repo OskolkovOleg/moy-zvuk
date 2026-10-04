@@ -13,6 +13,7 @@ import '../test/collection_controller_test.dart' as collection;
 import '../test/wave_buffer_test.dart' as wave;
 
 import '../test/lyrics_test.dart' as lyrics;
+import '../test/lyrics_translation_test.dart' as lyrics_translation;
 import '../test/personal_api_test.dart' as personal;
 import '../test/personal_store_test.dart' as personal_store;
 
@@ -31,6 +32,7 @@ void main() {
   group('Search', search.main);
   group('Sleep timer', sleep.main);
   group('Lyrics', lyrics.main);
+  group('Lyrics translation', lyrics_translation.main);
   group('Personal API', personal.main);
   group('Personal store', personal_store.main);
   group('Catalog', catalog.main);

@@ -18,6 +18,8 @@ dependencies:
     path: third_party/audio_service
   audio_session: ^0.2.4
   file_picker: ^13.1.0
+  google_mlkit_translation: ^0.15.1
+  google_mlkit_language_id: ^0.15.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -30,3 +32,4 @@ flutter:
   assets:
     - THIRD_PARTY_NOTICES.txt
     - assets/brand/icon.png
+    - assets/translation/
