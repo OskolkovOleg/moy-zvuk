@@ -227,6 +227,48 @@ class TrackMenu extends StatelessWidget {
   );
 }
 
+class FavoriteButton extends StatelessWidget {
+  const FavoriteButton(this.app, this.track, {super.key});
+  final AppController app;
+  final Track track;
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: app,
+    builder: (context, _) {
+      final liked = app.isFavorite(track.id);
+      return Semantics(
+        toggled: liked,
+        child: IconButton(
+          key: ValueKey('favorite:${track.id}'),
+          tooltip:
+              '${liked ? 'Убрать из любимого' : 'В любимое'}: ${track.title}',
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          color: liked ? Theme.of(context).colorScheme.primary : null,
+          icon: Icon(
+            liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+            size: 22,
+          ),
+          onPressed: app.account == null || app.api == null || app.serverBusy
+              ? null
+              : () async {
+                  try {
+                    await app.setFavorite(track, !liked);
+                  } catch (_) {
+                    if (context.mounted) {
+                      notify(
+                        context,
+                        'Избранное не изменилось. Проверь подключение и повтори.',
+                      );
+                    }
+                  }
+                },
+        ),
+      );
+    },
+  );
+}
+
 class TrackTile extends StatelessWidget {
   const TrackTile({
     super.key,
@@ -248,7 +290,7 @@ class TrackTile extends StatelessWidget {
   final bool? showRatings;
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: Listenable.merge([app.music.revision, app.music.downloads]),
+    animation: Listenable.merge([app, app.music.revision, app.music.downloads]),
     builder: (context, _) {
       final current = app.music.playlist.current?.id == track.id;
       final scheme = Theme.of(context).colorScheme;
@@ -347,6 +389,7 @@ class TrackTile extends StatelessWidget {
                 ),
               ),
             ),
+            FavoriteButton(app, track),
             if ((showRatings ?? app.ranked) && !catalog)
               RatingControls(
                 compact: true,
@@ -365,14 +408,6 @@ class TrackTile extends StatelessWidget {
                       ? () => moveWithFeedback(context, app, orderIndex!, 1)
                       : null,
                 ),
-              if (onActions != null)
-                IconButton(
-                  tooltip: 'Действия: ${track.title}',
-                  onPressed: onActions,
-                  icon: const Icon(Icons.more_horiz_rounded),
-                )
-              else
-                TrackMenu(app, track),
             ],
           ],
         ),

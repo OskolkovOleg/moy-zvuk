@@ -21,7 +21,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 
-Material Design Icons — add / remove
+Material Design Icons — add / remove / favorite / favorite_border
 Copyright Google LLC. Licensed under Apache License 2.0.
 Source: https://github.com/google/material-design-icons
 

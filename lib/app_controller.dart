@@ -15,6 +15,23 @@ part 'personal_controller.dart';
 class AppController extends ChangeNotifier {
   AppController(this.store, this.music, {this.tokens = const TokenStore()}) {
     music.onNotificationVote = _voteFromNotification;
+    music.onNotificationFavorite = _favoriteFromNotification;
+  }
+
+  Future<bool> _favoriteFromNotification(
+    String accountId,
+    Track track,
+    bool liked,
+  ) async {
+    final session = api;
+    if (account?.id != accountId || session == null) return false;
+    await setFavorite(track, liked);
+    return account?.id == accountId && api == session;
+  }
+
+  void _publishFavorites() {
+    final id = account?.id;
+    if (id != null) music.setNotificationFavorites(id, favoriteTracks);
   }
 
   Future<void> _voteFromNotification(
@@ -30,6 +47,9 @@ class AppController extends ChangeNotifier {
   void dispose() {
     if (music.onNotificationVote == _voteFromNotification) {
       music.onNotificationVote = null;
+    }
+    if (music.onNotificationFavorite == _favoriteFromNotification) {
+      music.onNotificationFavorite = null;
     }
     super.dispose();
   }
@@ -158,6 +178,7 @@ class AppController extends ChangeNotifier {
     savedCatalogError = null;
     savedCatalogLoading = false;
     favoriteTracks = await store.loadTracks(id, 'favorites');
+    _publishFavorites();
     tracks = listId == 'favorites'
         ? favoriteTracks
         : await store.loadTracks(id, listId);
@@ -236,6 +257,7 @@ class AppController extends ChangeNotifier {
       if (account?.id == id) {
         if (revision != _catalogRevision) return;
         favoriteTracks = favorites;
+        _publishFavorites();
         playlists = lists;
         if (selection == _selection) tracks = active;
       }
@@ -260,22 +282,33 @@ class AppController extends ChangeNotifier {
     final cached = await store.loadTracks(id, selected);
     final order = await store.loadOrder(id, selected);
     if (selection != _selection || account?.id != id) return;
-    tracks = cached;
+    tracks = selected == 'favorites' ? favoriteTracks : cached;
     manualOrder = order;
     notifyListeners();
     if (api == null) return;
+    final session = api!, revision = _catalogRevision;
     try {
       final result = selected == 'favorites'
-          ? await api!.favorites()
-          : await api!.playlistTracks(selected);
+          ? await session.favorites()
+          : await session.playlistTracks(selected);
+      if (revision != _catalogRevision || api != session || account?.id != id) {
+        return;
+      }
       await store.saveTracks(id, selected, result);
-      if (selection == _selection && account?.id == id) {
+      if (selection == _selection &&
+          account?.id == id &&
+          revision == _catalogRevision) {
         tracks = result;
-        if (selected == 'favorites') favoriteTracks = result;
+        if (selected == 'favorites') {
+          favoriteTracks = result;
+          _publishFavorites();
+        }
         message = null;
       }
     } catch (e) {
-      if (selection == _selection) {
+      if (selection == _selection &&
+          api == session &&
+          revision == _catalogRevision) {
         message = e is ZvukException
             ? e.message
             : 'Не удалось загрузить плейлист.';
@@ -412,11 +445,20 @@ class AppController extends ChangeNotifier {
     session,
     id,
   ) async {
+    final committed = favoriteTracks.where((t) => t.id != track.id).toList();
+    if (liked) committed.insert(0, track);
     await session.setCollectionItem(track.id, liked: liked);
+    // Persist the successful write even when the follow-up read loses network.
+    // Votes, order, downloaded files and the playback queue are independent.
+    await _readBack(
+      session,
+      () => store.saveTracks(id, 'favorites', committed),
+    );
     if (api == session && account?.id == id) {
-      favoriteTracks = favoriteTracks.where((t) => t.id != track.id).toList();
-      if (liked) favoriteTracks.insert(0, track);
+      favoriteTracks = committed;
       if (listId == 'favorites') tracks = favoriteTracks;
+      _publishFavorites();
+      notifyListeners();
     }
     await _readBack(session, () async {
       final favorites = await session.favorites();
@@ -424,6 +466,8 @@ class AppController extends ChangeNotifier {
       if (api == session && account?.id == id) {
         favoriteTracks = favorites;
         if (listId == 'favorites') tracks = favorites;
+        _publishFavorites();
+        message = null;
       }
     });
   });

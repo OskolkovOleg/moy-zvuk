@@ -4,7 +4,7 @@ const musicServiceConfig = AudioServiceConfig(
   androidNotificationChannelId: 'dev.oleg.zvuk_personal.playback',
   androidNotificationChannelName: 'Музыка',
   androidNotificationChannelDescription:
-      'Плеер: пауза, переключение и оценки −1 / +1',
+      'Плеер: пауза, следующая песня, избранное и оценки −1 / +1',
   androidNotificationIcon: 'drawable/ic_stat_music',
   // Keep the foreground service and its media controls through pauses and
   // source changes. Rating actions never interrupt playback.

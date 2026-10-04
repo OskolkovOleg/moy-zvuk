@@ -73,7 +73,11 @@ void main() {
       final info = await notification();
       expect(info['present'], true);
       expect(info['foreground'], true);
-      expect(info['customLabels'], ['Минус 1 балл', 'Плюс 1 балл']);
+      expect(info['customLabels'], [
+        'В любимое',
+        'Минус 1 балл',
+        'Плюс 1 балл',
+      ]);
       expect(
         (info['customIcons'] as List).every((id) => (id as int) > 0),
         true,

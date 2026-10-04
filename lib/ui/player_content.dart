@@ -60,6 +60,7 @@ class _PlayerContent extends StatelessWidget {
                   ],
                 ),
               ),
+              FavoriteButton(app, track),
               TrackMenu(app, track),
             ],
           ),
