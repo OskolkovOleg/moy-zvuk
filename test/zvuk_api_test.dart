@@ -11,26 +11,113 @@ void main() {
   test(
     'Streaming sends the selected quality only to the authenticated API',
     () async {
-      final qualities = <String?>[];
+      var calls = 0;
       final api = ZvukApi(
         'test-secret',
         client: MockClient((request) async {
           expect(request.url.host, 'zvuk.com');
           expect(request.url.scheme, 'https');
           expect(request.headers['X-Auth-Token'], 'test-secret');
-          qualities.add(request.url.queryParameters['quality']);
+          calls++;
+          expect(request.method, 'POST');
+          final body = jsonDecode(request.body);
+          expect(body['operationName'], 'getStream');
+          expect(body['variables']['ids'], ['one']);
           return http.Response(
-            '{"result":{"stream":"https://audio.example/track.mp3"}}',
+            '{"data":{"mediaContents":[{"stream":{"high":"https://audio.example/high.mp3","mid":"https://audio.example/mid.mp3"}}]}}',
             200,
           );
         }),
       );
-      await api.streamUrl('one');
-      await api.streamUrl('one', quality: AudioQuality.economy);
-      expect(qualities, ['high', 'mid']);
+      expect(await api.streamUrl('one'), 'https://audio.example/high.mp3');
+      expect(
+        await api.streamUrl('one', quality: AudioQuality.economy),
+        'https://audio.example/mid.mp3',
+      );
+      expect(calls, 2);
       api.close();
     },
   );
+  test('Stream retries temporary errors, but not auth or mutations', () async {
+    var calls = 0;
+    final api = ZvukApi(
+      'secret',
+      client: MockClient((req) async {
+        calls++;
+        if (calls == 1) return http.Response('private server text', 503);
+        return http.Response(
+          '{"data":{"mediaContents":[{"stream":{"high":"https://audio.example/a.mp3"}}]}}',
+          200,
+        );
+      }),
+    );
+    expect(await api.streamUrl('a'), 'https://audio.example/a.mp3');
+    expect(calls, 2);
+    api.close();
+    calls = 0;
+    final unauthorized = ZvukApi(
+      'secret',
+      client: MockClient((_) async {
+        calls++;
+        return http.Response('private body', 403);
+      }),
+    );
+    await expectLater(
+      unauthorized.streamUrl('a'),
+      throwsA(isA<ZvukException>().having((e) => e.auth, 'auth', true)),
+    );
+    expect(calls, 1);
+    unauthorized.close();
+    calls = 0;
+    final mutation = ZvukApi(
+      'secret',
+      client: MockClient((_) async {
+        calls++;
+        return http.Response('private body', 503);
+      }),
+    );
+    await expectLater(
+      mutation.setCollectionItem('a', liked: true),
+      throwsA(isA<ZvukException>()),
+    );
+    expect(calls, 1);
+    mutation.close();
+  });
+  test('Stream timeout is bounded and response bodies stay private', () async {
+    var calls = 0;
+    final api = ZvukApi(
+      'secret',
+      streamTimeout: const Duration(milliseconds: 20),
+      client: MockClient((_) async {
+        calls++;
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        return http.Response('{}', 200);
+      }),
+    );
+    await expectLater(
+      api.streamUrl('a'),
+      throwsA(
+        isA<ZvukException>().having((e) => e.retryable, 'retryable', true),
+      ),
+    );
+    expect(calls, 2);
+    api.close();
+    final bad = ZvukApi(
+      'secret',
+      client: MockClient((_) async => http.Response('secret body', 200)),
+    );
+    await expectLater(
+      bad.streamUrl('a'),
+      throwsA(
+        isA<ZvukException>().having(
+          (e) => e.message,
+          'redacted',
+          isNot(contains('secret')),
+        ),
+      ),
+    );
+    bad.close();
+  });
   Map<String, dynamic> track(int i) => {
     'id': '$i',
     'title': 'Track $i',

@@ -18,24 +18,73 @@ part 'radio_api.dart';
 part 'search_api.dart';
 
 class ZvukException implements Exception {
-  const ZvukException(this.message, {this.auth = false});
+  const ZvukException(
+    this.message, {
+    this.auth = false,
+    this.retryable = false,
+  });
   final String message;
   final bool auth;
+  final bool retryable;
   @override
   String toString() => message;
 }
 
 class ZvukApi {
-  ZvukApi(this.token, {http.Client? client})
-    : _client = client ?? http.Client();
+  ZvukApi(
+    this.token, {
+    http.Client? client,
+    this.streamTimeout = const Duration(seconds: 8),
+  }) : _client = client ?? http.Client(),
+       _ownsClient = client == null;
   final String token;
   final http.Client _client;
+  final bool _ownsClient;
+  final Duration streamTimeout;
   final Map<String, Cookie> _cookies = {};
   static const _fields =
       'id title duration artists { id title } release { id image { src } }';
   void close() => _client.close();
 
   Future<Map<String, dynamic>> _request(
+    String path, {
+    Map<String, String>? params,
+    Map<String, dynamic>? body,
+    int attempts = 1,
+    Duration timeout = const Duration(seconds: 25),
+    bool freshConnection = false,
+  }) async {
+    // Only stream lookup opts into repeating a POST: it is a read query.
+    assert(
+      attempts == 1 || body == null || body['operationName'] == 'getStream',
+    );
+    for (var attempt = 0; ; attempt++) {
+      final client = freshConnection && _ownsClient ? http.Client() : _client;
+      try {
+        return await _requestOnce(
+          client,
+          path,
+          params: params,
+          body: body,
+        ).timeout(timeout);
+      } on TimeoutException {
+        if (attempt + 1 >= attempts) {
+          throw const ZvukException(
+            'Сервис музыки не ответил вовремя. Проверь соединение.',
+            retryable: true,
+          );
+        }
+      } on ZvukException catch (e) {
+        if (!e.retryable || attempt + 1 >= attempts) rethrow;
+      } finally {
+        if (!identical(client, _client)) client.close();
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    }
+  }
+
+  Future<Map<String, dynamic>> _requestOnce(
+    http.Client client,
     String path, {
     Map<String, String>? params,
     Map<String, dynamic>? body,
@@ -68,9 +117,7 @@ class ZvukApi {
               .join('; ');
         }
         if (payload != null) request.body = payload;
-        response = await http.Response.fromStream(
-          await _client.send(request).timeout(const Duration(seconds: 25)),
-        ).timeout(const Duration(seconds: 25));
+        response = await http.Response.fromStream(await client.send(request));
         final setCookie = response.headers['set-cookie'];
         if (setCookie != null) {
           for (final value in setCookie.split(RegExp(r',(?=\s*[^;,=\s]+=)'))) {
@@ -117,20 +164,45 @@ class ZvukApi {
         );
       }
       if (response.statusCode != 200) {
-        throw const ZvukException('Звук сейчас недоступен. Попробуй ещё раз.');
+        final status = response.statusCode;
+        throw ZvukException(
+          'Звук сейчас недоступен (HTTP $status). Попробуй ещё раз.',
+          retryable:
+              status == 408 || status == 418 || status == 429 || status >= 500,
+        );
       }
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       if (data['errors'] != null || data['error'] != null) {
-        throw const ZvukException(
-          'Звук не выполнил запрос. Проверь подключение.',
+        final errors = data['errors'];
+        final auth =
+            errors is List &&
+            errors.whereType<Map>().any(
+              (e) =>
+                  e['extensions'] is Map &&
+                  [
+                    'UNAUTHENTICATED',
+                    'UNAUTHORIZED',
+                    'FORBIDDEN',
+                  ].contains(e['extensions']['code']),
+            );
+        throw ZvukException(
+          auth
+              ? 'Подключение истекло. Обнови токен в настройках.'
+              : 'Звук не выполнил запрос. Проверь подключение.',
+          auth: auth,
         );
       }
       return data;
     } on ZvukException {
       rethrow;
+    } on FormatException {
+      throw const ZvukException(
+        'Звук вернул неожиданный ответ. Попробуй ещё раз.',
+      );
     } catch (_) {
       throw const ZvukException(
         'Не удалось связаться со Звуком. Проверь интернет.',
+        retryable: true,
       );
     }
   }
@@ -252,10 +324,23 @@ class ZvukApi {
     AudioQuality quality = AudioQuality.high,
   }) async {
     final data = await _request(
-      '/api/tiny/track/stream',
-      params: {'id': id, 'quality': quality.apiValue},
+      '/api/v1/graphql',
+      body: {
+        'operationName': 'getStream',
+        'query': r'query getStream($ids: [ID!]!) { mediaContents(ids: $ids) { ... on Track { stream { high mid } } } }',
+        'variables': {
+          'ids': [id],
+        },
+      },
+      attempts: 2,
+      timeout: streamTimeout,
+      freshConnection: true,
     );
-    final url = data['result']?['stream'];
+    final payload = data['data'];
+    final items = payload is Map ? payload['mediaContents'] : null;
+    final item = items is List && items.isNotEmpty ? items.first : null;
+    final stream = item is Map ? item['stream'] : null;
+    final url = stream is Map ? stream[quality.apiValue] : null;
     final uri = url is String ? Uri.tryParse(url) : null;
     if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
       throw const ZvukException(

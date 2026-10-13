@@ -21,8 +21,8 @@ class Handler(BaseHTTPRequestHandler):
             Handler.delivered = True
             data = {'token': TOKEN.strip()}
         elif self.path.removeprefix('/stream/') in ALLOWED:
-            result = CLIENT.get_direct_stream_url(self.path.removeprefix('/stream/'))
-            data = {'stream': result.stream}
+            url = CLIENT.get_stream_url(self.path.removeprefix('/stream/'))
+            data = {'stream': url}
         else:
             self.send_error(404)
             return

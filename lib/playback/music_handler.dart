@@ -20,15 +20,13 @@ import 'sleep_timer.dart';
 part 'queue_controls.dart';
 part 'notification_controls.dart';
 part 'wave_preferences.dart';
+part 'stream_recovery.dart';
 
 class MusicHandler extends BaseAudioHandler with SeekHandler {
   MusicHandler(this.store) : downloads = DownloadManager(store) {
     player.playbackEventStream.listen(
       (_) => _broadcast(),
-      onError: (Object _, StackTrace _) {
-        error.value =
-            'Не удалось воспроизвести трек. Повтори или выбери следующий.';
-      },
+      onError: (Object failure, StackTrace _) => _playbackFailed(failure),
     );
     player.playerStateStream.listen((_) {
       // Playing can change separately from playbackEventStream (audio focus,
@@ -43,7 +41,14 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
       revision.value++;
     });
     _timer = Timer.periodic(const Duration(seconds: 10), (_) {
-      if (player.playing) unawaited(_saveSafely());
+      if (player.playing) {
+        if (player.position - _sourceStartPosition >=
+            const Duration(seconds: 20)) {
+          _runtimeRetries.clear();
+          _failedRuntimeEntries.clear();
+        }
+        unawaited(_saveSafely());
+      }
     });
   }
   final LibraryStore store;
@@ -292,6 +297,10 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
   int _generation = 0;
   Duration _restoredPosition = Duration.zero;
   Future<void> _pending = Future.value();
+  bool _playIntent = false;
+  DateTime? _networkBlockedUntil;
+  Duration _sourceStartPosition = Duration.zero;
+  final Set<int> _runtimeRetries = {}, _failedRuntimeEntries = {};
 
   Duration get position => _loaded ? player.position : _restoredPosition;
   Duration get duration => _loaded
@@ -316,6 +325,11 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
   }
 
   Future<void> configure(String account, ZvukApi? api) async {
+    if (_account != account || !identical(_api, api)) {
+      _networkBlockedUntil = null;
+      _runtimeRetries.clear();
+      _failedRuntimeEntries.clear();
+    }
     if (_account != account) {
       _audioPreferences = AudioPreferences.fromJson(
         await store.get(account, 'audioPreferences'),
@@ -496,81 +510,13 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     await _saveSafely();
   }
 
-  Future<void> _loadAndPlay({bool autoplay = true}) {
-    final generation = ++_generation;
-    final track = playlist.current;
-    final api = _api, account = _account;
-    _loaded = false;
-    _historyRecorded = false;
-    _loading = track != null && autoplay;
-    error.value = null;
-    // Stop promptly, then serialize source loading so an older HTTP request
-    // can never replace the newest selected song.
-    unawaited(player.pause());
-    unawaited(_saveSafely());
-    _broadcast();
-    final position = _restoredPosition;
-    _pending = _pending.catchError((_) {}).then((_) async {
-      if (generation != _generation) return;
-      if (track == null || !autoplay) {
-        await player.stop();
-        if (generation == _generation) {
-          _broadcast();
-          await _saveSafely();
-        }
-        return;
-      }
-      try {
-        final local = account == null
-            ? null
-            : await downloads.localPath(account, track.id);
-        if (generation != _generation) return;
-        if (local != null) {
-          await player.setFilePath(local, initialPosition: position);
-        } else {
-          if (api == null) {
-            throw const ZvukException(
-              'Эта песня не скачана. Подключи Звук и сохрани её для прослушивания без интернета.',
-            );
-          }
-          final url = await api.streamUrl(
-            track.id,
-            quality: _audioPreferences.streaming,
-          );
-          if (generation != _generation) return;
-          await player.setUrl(url, initialPosition: position);
-        }
-        if (generation != _generation) return;
-        _loaded = true;
-        _loading = false;
-        _restoredPosition = Duration.zero;
-        _broadcast();
-        await _saveSafely();
-        if (generation != _generation) return;
-        unawaited(
-          player.play().catchError((_) {
-            if (generation == _generation) {
-              error.value = 'Поток прервался. Нажми воспроизведение ещё раз.';
-            }
-          }),
-        );
-      } catch (e) {
-        if (generation == _generation) {
-          _loading = false;
-          _loaded = false;
-          error.value = e is ZvukException ? e.message : 'Трек не загрузился. Проверь сеть и повтори или выбери следующий.';
-          await player.stop();
-          _broadcast();
-        }
-      }
-    });
-    _prefetchWave();
-    return _pending;
-  }
-
   @override
   Future<void> play() async {
     if (playlist.current == null) return;
+    _playIntent = true;
+    _runtimeRetries.clear();
+    _failedRuntimeEntries.clear();
+    _networkBlockedUntil = null;
     if (!_loaded) {
       await _loadAndPlay();
       return;
@@ -582,10 +528,10 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
       if (generation != _generation) return;
     }
     error.value = null;
+    final generation = _generation;
     unawaited(
-      player.play().catchError((_) {
-        error.value = 'Поток прервался. Выбери трек ещё раз.';
-        _loaded = false;
+      player.play().catchError((Object failure) {
+        if (generation == _generation) _playbackFailed(failure);
       }),
     );
   }
@@ -595,6 +541,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     // Cancel an imminent play even after source loading has finished, while
     // the queue position is still being saved.
     ++_generation;
+    _playIntent = false;
     _loading = false;
     await player.pause();
     await _saveSafely();
@@ -626,7 +573,9 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
   }
 
   @override
-  Future<void> skipToNext() async {
+  Future<void> skipToNext() => _skipNext();
+
+  Future<void> _skipNext({bool automatic = false}) async {
     if (_waitingNext) return;
     if (!playlist.hasNext && isWave) {
       _waitingNext = true;
@@ -677,7 +626,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     }
     _restoredPosition = Duration.zero;
     _publishQueue(updateQueue: false);
-    await _loadAndPlay();
+    await _loadAndPlay(forceNetwork: !automatic);
   }
 
   @override
@@ -733,7 +682,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
       } else if (repeatMode == AudioServiceRepeatMode.one) {
         await play();
       } else if (canSkipNext) {
-        await skipToNext();
+        await _skipNext(automatic: true);
       } else {
         await pause();
       }
