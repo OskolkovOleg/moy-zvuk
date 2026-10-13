@@ -24,10 +24,16 @@ part 'stream_recovery.dart';
 
 class MusicHandler extends BaseAudioHandler with SeekHandler {
   MusicHandler(this.store) : downloads = DownloadManager(store) {
-    player.playbackEventStream.listen(
-      (_) => _broadcast(),
-      onError: (Object failure, StackTrace _) => _playbackFailed(failure),
-    );
+    player.playbackEventStream.listen((_) => _broadcast());
+    player.errorStream.listen(_playbackFailed);
+    player.positionStream.listen((position) {
+      if (_loaded &&
+          !_loading &&
+          player.playing &&
+          player.processingState == ProcessingState.ready) {
+        _lastActivePosition = position;
+      }
+    });
     player.playerStateStream.listen((_) {
       // Playing can change separately from playbackEventStream (audio focus,
       // pause/resume). Keep the Android MediaSession in sync in every case.
@@ -299,7 +305,8 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
   Future<void> _pending = Future.value();
   bool _playIntent = false;
   DateTime? _networkBlockedUntil;
-  Duration _sourceStartPosition = Duration.zero;
+  Duration _sourceStartPosition = Duration.zero,
+      _lastActivePosition = Duration.zero;
   final Set<int> _runtimeRetries = {}, _failedRuntimeEntries = {};
 
   Duration get position => _loaded ? player.position : _restoredPosition;

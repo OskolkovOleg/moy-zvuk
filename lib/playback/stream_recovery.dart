@@ -13,7 +13,9 @@ extension StreamRecovery on MusicHandler {
     final key = playlist.entryKey(playlist.index);
     final retry = _runtimeRetries.add(key);
     if (!retry) _failedRuntimeEntries.add(key);
-    _restoredPosition = retry ? position : Duration.zero;
+    _restoredPosition = retry
+        ? (position > _lastActivePosition ? position : _lastActivePosition)
+        : Duration.zero;
     unawaited(_loadAndPlay(forceNetwork: false, skipCurrent: !retry));
   }
 
@@ -148,6 +150,7 @@ extension StreamRecovery on MusicHandler {
           _loading = false;
           _restoredPosition = Duration.zero;
           _sourceStartPosition = position;
+          _lastActivePosition = position;
           error.value = null;
           _broadcast();
           await _saveSafely();

@@ -37,7 +37,11 @@ class RecoveryApi extends ZvukApi {
       throw const ZvukException('Synthetic unavailable song');
     }
     if (id == 'delayed' && gate != null) await gate!.future;
-    final path = id == 'expired' && count == 1 ? 'forbidden' : id;
+    final path = id == 'expired' && count == 1
+        ? 'forbidden'
+        : id == 'runtime' && count == 1
+        ? 'interrupted'
+        : id;
     return 'http://127.0.0.1:$port/$path.wav';
   }
 }
@@ -53,7 +57,25 @@ void main() {
         databasePath: '${directory.path}/test.db',
       );
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      var interruptedRequests = 0;
       server.listen((request) async {
+        if (request.uri.path == '/interrupted.wav') {
+          if (interruptedRequests++ > 0) {
+            request.response.statusCode = 403;
+            await request.response.close();
+          } else {
+            final data = silence(40);
+            request.response.headers.contentType = ContentType('audio', 'wav');
+            request.response.contentLength = data.length;
+            request.response.add(data.sublist(0, 320000));
+            await request.response.flush();
+            await Future<void>.delayed(const Duration(seconds: 3));
+            try {
+              await request.response.close();
+            } catch (_) {}
+          }
+          return;
+        }
         if (request.uri.path == '/forbidden.wav') {
           request.response.statusCode = 403;
         } else {
@@ -131,6 +153,32 @@ void main() {
         expect(api.calls['expired'], 2);
         print(
           'RECOVERY: unavailable track skipped, expired CDN URL replaced with fresh URL for same song',
+        );
+
+        api.calls.clear();
+        const runtime = Track(
+          id: 'runtime',
+          title: 'Обрыв во время песни',
+          duration: 40,
+        );
+        await music.playList([runtime, cached], 0);
+        await until(
+          () => music.player.playing && music.position.inMilliseconds > 200,
+        );
+        final runtimeKey = music.playlist.entryKey(music.playlist.index);
+        await until(
+          () =>
+              api.calls['runtime'] == 2 &&
+              music.player.playing &&
+              !music.loading,
+          seconds: 35,
+        );
+        expect(music.playlist.current!.id, 'runtime');
+        expect(music.playlist.entryKey(music.playlist.index), runtimeKey);
+        expect(music.position.inSeconds, greaterThanOrEqualTo(1));
+        expect(music.error.value, isNull);
+        print(
+          'RECOVERY: real interrupted HTTP stream resumes same occurrence at preserved position with fresh URL',
         );
 
         await music.setRepeatMode(AudioServiceRepeatMode.all);
