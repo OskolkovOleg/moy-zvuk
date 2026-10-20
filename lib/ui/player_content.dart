@@ -60,7 +60,6 @@ class _PlayerContent extends StatelessWidget {
                   ],
                 ),
               ),
-              FavoriteButton(app, track),
               TrackMenu(app, track),
             ],
           ),
@@ -90,49 +89,20 @@ class _PlayerContent extends StatelessWidget {
 
   Widget rating(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final ordered = app.visibleTracks;
-    final index = ordered.indexWhere((t) => t.id == track.id);
-    if (app.ranked) {
-      return Row(
-        children: [
-          Expanded(
-            child: Text(
-              'Твой счёт',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant),
-            ),
-          ),
-          RatingControls(
-            score: app.scoreFor(track),
-            title: track.title,
-            onVote: (delta) => voteWithFeedback(context, app, track, delta),
-          ),
-        ],
-      );
-    }
-    if (index < 0) return const SizedBox.shrink();
     return Row(
       children: [
         Expanded(
-          child: Tooltip(
-            message: 'В «${app.listTitle}»',
-            child: Text(
-              'Вручную: № ${index + 1}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 14),
-            ),
+          child: Text(
+            'Твой счёт',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant),
           ),
         ),
-        OrderControls(
+        RatingControls(
+          score: app.scoreFor(track),
           title: track.title,
-          onUp: index > 0 && !app.reordering
-              ? () => moveWithFeedback(context, app, index, -1)
-              : null,
-          onDown: index < ordered.length - 1 && !app.reordering
-              ? () => moveWithFeedback(context, app, index, 1)
-              : null,
+          onVote: (delta) => voteWithFeedback(context, app, track, delta),
         ),
       ],
     );

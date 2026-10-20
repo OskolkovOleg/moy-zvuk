@@ -2,19 +2,25 @@ import 'dart:math';
 
 import '../data/models.dart';
 
-/// Select before shuffling so low-scoring tracks cannot displace the top N.
-/// Each occurrence appears once; a playlist may already contain duplicates.
+class ScoreRange {
+  const ScoreRange(this.min, this.max) : assert(min <= max);
+  final int min, max;
+}
+
+/// Filter before randomizing. Include both boundaries and every occurrence.
 List<Track> shuffledTracks(
   List<Track> source,
   Map<String, Rating> ratings, {
-  int? bestCount,
+  int? minScore,
+  int? maxScore,
   Random? random,
 }) {
-  if (bestCount != null && bestCount < 1) {
-    throw ArgumentError.value(bestCount, 'bestCount', 'Must be positive');
+  if (minScore != null && maxScore != null && minScore > maxScore) {
+    throw ArgumentError('Начало диапазона больше конца');
   }
-  final selected = bestCount == null
-      ? List<Track>.of(source)
-      : rankedTracks(source, ratings).take(bestCount).toList();
-  return selected..shuffle(random);
+  return source.where((track) {
+    final score = trackScore(track.id, ratings);
+    return (minScore == null || score >= minScore) &&
+        (maxScore == null || score <= maxScore);
+  }).toList()..shuffle(random);
 }

@@ -319,7 +319,6 @@ class _CatalogDetailScreenState extends State<CatalogDetailScreen> {
                       itemBuilder: (context, index) => TrackTile(
                         app: app,
                         track: data.tracks[index],
-                        catalog: true,
                         onActions: () => openTrackActions(
                           context,
                           app,

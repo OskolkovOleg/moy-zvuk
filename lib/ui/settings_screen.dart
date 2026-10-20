@@ -172,37 +172,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<void> sort() async {
-    final app = widget.app, account = widget.app.account?.id;
-    final ranked = await showModalBottomSheet<bool>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheet) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final value in [false, true])
-              ListTile(
-                title: Text(value ? 'По баллам' : 'Мой порядок'),
-                subtitle: Text(
-                  value
-                      ? 'Самые ценные песни сверху'
-                      : 'Порядок, который ты задаёшь стрелками',
-                ),
-                trailing: app.ranked == value
-                    ? const Icon(Icons.check_rounded)
-                    : null,
-                onTap: () => Navigator.pop(sheet, value),
-              ),
-          ],
-        ),
-      ),
-    );
-    if (ranked != null && account == app.account?.id) {
-      await app.setSort(ranked);
-    }
-  }
-
   Future<void> exportBackup() async {
     final account = widget.app.account?.id;
     if (account == null || transferring) return;
@@ -382,20 +351,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           SettingsSection(
             title: 'Библиотека и баллы',
-            note: 'Каждая песня начинает с 10 баллов. Минус снижает балл и оставляет песню в списке.',
             children: [
-              SettingsRow(
-                key: const Key('settings-sort'),
-                icon: Icons.sort_rounded,
-                title: 'Порядок песен',
-                subtitle: app.ranked ? 'По баллам' : 'Мой порядок',
-                onTap: sort,
-              ),
               SettingsRow(
                 key: const Key('settings-export'),
                 icon: Icons.ios_share_rounded,
                 title: 'Сохранить в файл',
-                subtitle: 'Резервная копия баллов и порядка',
+                subtitle: 'Резервная копия баллов',
                 busy: transferring,
                 onTap: app.account == null ? null : exportBackup,
               ),

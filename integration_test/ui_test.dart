@@ -22,7 +22,7 @@ import '../test/widget_test.dart' as widgets;
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   group('Widgets on Android', widgets.main);
-  testWidgets('Manual ordering, top-down playback and redesigned screens', (
+  testWidgets('Score ordering, top-down playback and range shuffle', (
     tester,
   ) async {
     final directory = await Directory.systemTemp.createTemp('zvuk-ui-test');
@@ -70,43 +70,9 @@ void main() {
       await app.vote(app.tracks.first, 1);
       await tester.pumpAndSettle();
       expect(find.byType(WelcomeScreen), findsNothing);
-      expect(app.ranked, false);
-      expect(
-        tester
-            .widget<IconButton>(
-              find.byWidgetPredicate(
-                (w) =>
-                    w is IconButton &&
-                    w.tooltip == 'Выше: ${playable[0].title}',
-              ),
-            )
-            .onPressed,
-        isNull,
-      );
-      await tester.tap(find.byTooltip('Ниже: ${playable[0].title}'));
-      await tester.pumpAndSettle();
-      expect(app.visibleTracks.take(2).map((t) => t.id), [
-        playable[1].id,
-        playable[0].id,
-      ]);
-      final restored = AppController(store, music)..account = app.account;
-      await restored.selectPlaylist(null);
-      expect(
-        restored.visibleTracks.map((t) => t.id),
-        app.visibleTracks.map((t) => t.id),
-      );
-      restored.dispose();
-      expect((await store.ratings('ui-test'))[playable[0].id]!.score, 11);
-      await Future<void>.delayed(const Duration(seconds: 3));
-      await tester.pumpAndSettle();
-      await binding.takeScreenshot('v120-02-library');
-      await tester.tap(find.text('По баллам'));
-      await tester.pumpAndSettle();
       expect(app.visibleTracks.first.id, playable[0].id);
-      expect(find.text('11'), findsWidgets);
-      await binding.takeScreenshot('v120-03-ratings');
-      await tester.tap(find.text('Мой порядок'));
-      await tester.pumpAndSettle();
+      expect((await store.ratings('ui-test'))[playable[0].id]!.score, 10);
+      await binding.takeScreenshot('v140-02-library-by-score');
       final launchOrder = app.visibleTracks.map((t) => t.id).toList();
       await tester.tap(find.byKey(const Key('play-from-top')));
       await tester.pump();
@@ -114,9 +80,8 @@ void main() {
           .firstWhere((p) => p.inMilliseconds > 800)
           .timeout(const Duration(seconds: 45));
       expect(music.playlist.tracks.map((t) => t.id), launchOrder);
-      expect(music.playlist.current!.id, playable[1].id);
-      expect(music.sourceTitle, 'Любимое');
-      await app.moveTrack(0, 1);
+      expect(music.playlist.current!.id, playable[0].id);
+      expect(music.sourceTitle, 'Мои песни');
       expect(music.playlist.tracks.map((t) => t.id), launchOrder);
       await music.seek(music.duration - const Duration(seconds: 1));
       final deadline = DateTime.now().add(const Duration(seconds: 45));
@@ -125,11 +90,11 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 100));
       }
       expect(music.playlist.index, 1);
-      expect(music.playlist.current!.id, playable[0].id);
+      expect(music.playlist.current!.id, playable[1].id);
       expect(music.error.value, isNull);
       await music.pause();
       print(
-        'MANUAL_ORDER persisted=passed ratingsPreserved=passed TOP_DOWN queue=passed autoNext=passed independent=passed',
+        'SCORE_ORDER ratingsPreserved=passed TOP_DOWN queue=passed autoNext=passed',
       );
       await tester.pumpAndSettle();
       final mini = find.byType(MiniPlayer);
@@ -167,8 +132,6 @@ void main() {
       Navigator.of(tester.element(find.byType(PlayerSheet))).pop();
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      await tester.tap(find.text('По баллам'));
-      await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
@@ -184,24 +147,16 @@ void main() {
         playable[0].id: const Rating(18, 8),
         playable[1].id: const Rating(13, 3),
       };
-      final manualBefore = List<String>.of(app.manualOrder);
-      await app.setSort(false);
       await tester.tap(find.text('Библиотека').last);
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('shuffle-list')));
       await tester.pumpAndSettle();
-      expect(find.text('Все треки'), findsOneWidget);
-      await tester.tap(find.text('Лучшие по баллам'));
-      await tester.pumpAndSettle();
-      await tester.drag(
-        find.byKey(const Key('shuffle-count-slider')),
-        const Offset(-300, 0),
+      final slider = tester.widget<RangeSlider>(
+        find.byKey(const Key('shuffle-score-slider')),
       );
+      slider.onChanged!(const RangeValues(18, 18));
       await tester.pumpAndSettle();
-      expect(
-        tester.widget<Text>(find.byKey(const Key('shuffle-count'))).data,
-        '1',
-      );
+      expect(find.text('Подходит 1 трек'), findsOneWidget);
       await binding.takeScreenshot('v120-08-shuffle-best');
       await tester.tap(find.byKey(const Key('start-shuffle')));
       await tester.pump();
@@ -211,8 +166,7 @@ void main() {
       expect(music.playlist.tracks, hasLength(1));
       expect(music.playlist.current!.id, playable[0].id);
       expect(music.isShuffled, true);
-      expect(music.sourceTitle, 'Любимое · топ 1');
-      expect(app.manualOrder, manualBefore);
+      expect(music.sourceTitle, 'Мои песни · 18–18 баллов');
       await music.pause();
       await music.configure('other-test-account', null);
       await music.configure('ui-test', api);
@@ -224,12 +178,9 @@ void main() {
         music.playlist.tracks.map((t) => t.id),
         unorderedEquals(playable.map((t) => t.id)),
       );
-      expect(app.manualOrder, manualBefore);
       await music.pause();
       expect(tester.takeException(), isNull);
-      print(
-        'SHUFFLE topN=passed all=passed manualPreserved=passed restoreMode=passed',
-      );
+      print('SHUFFLE scoreRange=passed all=passed restoreMode=passed');
     } finally {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();

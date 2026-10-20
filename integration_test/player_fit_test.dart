@@ -38,8 +38,7 @@ void main() {
     );
     final app = AppController(store, music)
       ..account = const Account('player-fit', 'Тест')
-      ..tracks = [a, b]
-      ..ranked = true;
+      ..tracks = [a, b];
     Future<void> checkFit() async {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
@@ -61,6 +60,7 @@ void main() {
     }
 
     try {
+      await store.saveTracks('player-fit', 'favorites', [a, b]);
       await music.initialize();
       await music.configure('player-fit', null);
       music.playlist.replace([a, b], 0);
@@ -78,11 +78,11 @@ void main() {
       await binding.takeScreenshot('v181-$mode-normal');
       await tester.tap(find.byTooltip('Плюс один: ${a.title}'));
       await tester.pumpAndSettle();
-      expect(app.scoreFor(a), 11);
+      expect(app.scoreFor(a), 10);
       expect(find.byType(SnackBar), findsNothing);
       await tester.tap(find.byTooltip('Минус один: ${a.title}'));
       await tester.pumpAndSettle();
-      expect(app.scoreFor(a), 10);
+      expect(app.scoreFor(a), 9);
       expect(find.byType(SnackBar), findsNothing);
       tester.platformDispatcher.textScaleFactorTestValue = 1.6;
       await checkFit();
@@ -96,15 +96,8 @@ void main() {
       await checkFit();
       await binding.takeScreenshot('v181-$mode-error');
       music.error.value = null;
-      await app.setSort(false);
-      await checkFit();
-      await tester.tap(find.byTooltip('Ниже: ${a.title}'));
-      await tester.pumpAndSettle();
-      expect(app.visibleTracks.map((t) => t.id), ['fit-b', 'fit-a']);
-      expect(find.byType(SnackBar), findsNothing);
-      await binding.takeScreenshot('v181-$mode-manual');
       print(
-        'PLAYER FIT $mode: no scroll/overflow, visible controls, quiet votes, large text, error and manual order passed',
+        'PLAYER FIT $mode: no scroll/overflow, visible controls, quiet votes, large text, error passed',
       );
     } finally {
       tester.platformDispatcher.clearTextScaleFactorTestValue();

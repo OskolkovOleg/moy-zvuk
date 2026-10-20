@@ -17,6 +17,7 @@ import 'package:zvuk_personal/data/audio_preferences.dart';
 import 'package:zvuk_personal/playback/music_handler.dart';
 import 'package:zvuk_personal/playback/service_config.dart';
 import 'package:zvuk_personal/ui/player_sheet.dart';
+import 'package:zvuk_personal/ui/app.dart';
 import 'package:zvuk_personal/ui/theme.dart';
 import 'package:zvuk_personal/ui/widgets.dart';
 
@@ -77,188 +78,151 @@ class FavoriteFixtureApi extends ZvukApi {
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-  testWidgets('Favorite hearts preserve score, queue and compact player', (
-    tester,
-  ) async {
-    const a = Track(
-      id: 'favorite-ui-a',
-      title: 'Ночная дорога',
-      artists: 'Тестовый артист',
-      duration: 60,
-    );
-    const b = Track(
-      id: 'favorite-ui-b',
-      title: 'Длинное название новой песни',
-      artists: 'Другой артист',
-      duration: 60,
-    );
-    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    server.listen((request) async {
-      request.response.add(clips.silence(60));
-      await request.response.close();
-    });
-    final dir = await Directory.systemTemp.createTemp('zvuk-favorite-ui');
-    final store = await LibraryStore.open(databasePath: '${dir.path}/test.db');
-    final api = FavoriteFixtureApi(server.port, [a, b], {a.id});
-    final music = await AudioService.init<MusicHandler>(
-      builder: () => MusicHandler(store),
-      config: musicServiceConfig,
-    );
-    final app = AppController(store, music)
-      ..account = const Account('favorite-ui', 'Тест')
-      ..api = api
-      ..favoriteTracks = [a]
-      ..tracks = [a, b]
-      ..listId = 'fixture-playlist'
-      ..ranked = true;
-    Finder heart(Track t) => find.byKey(ValueKey('favorite:${t.id}'));
-    void checkHeart(Track t, bool filled) {
-      final icon = tester.widget<Icon>(
-        find.descendant(of: heart(t), matching: find.byType(Icon)),
+  testWidgets(
+    'Plus collects an outside song, rating-only UI and score range stay compact',
+    (tester) async {
+      const a = Track(
+        id: 'favorite-ui-a',
+        title: 'Ночная дорога',
+        artists: 'Тестовый артист',
+        duration: 60,
       );
-      expect(
-        icon.icon,
-        filled ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+      const b = Track(
+        id: 'favorite-ui-b',
+        title: 'Новая песня с длинным названием',
+        artists: 'Другой артист',
+        duration: 60,
       );
-    }
-
-    Future<void> settleEdit() async {
-      await clips.until(() => !app.serverBusy);
-      await tester.pumpAndSettle();
-    }
-
-    try {
-      await store.saveTracks('favorite-ui', 'favorites', [a]);
-      await store.saveOrder('favorite-ui', 'fixture-playlist', [b.id, a.id]);
-      for (var i = 0; i < 13; i++) {
-        await app.vote(a, -1);
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen((r) async {
+        r.response.add(clips.silence(60));
+        await r.response.close();
+      });
+      final dir = await Directory.systemTemp.createTemp('score-ui');
+      final store = await LibraryStore.open(
+        databasePath: '${dir.path}/test.db',
+      );
+      final api = FavoriteFixtureApi(server.port, [a, b], {a.id});
+      final music = await AudioService.init<MusicHandler>(
+        builder: () => MusicHandler(store),
+        config: musicServiceConfig,
+      );
+      final app = AppController(store, music)
+        ..account = const Account('score-ui', 'Тест')
+        ..api = api
+        ..favoriteTracks = [a]
+        ..tracks = [a];
+      try {
+        await store.saveTracks('score-ui', 'favorites', [a]);
+        await music.initialize();
+        await music.configure('score-ui', api);
+        await music.player.setVolume(0);
+        await music.playList([b, a], 0);
+        await clips.until(() => music.position.inMilliseconds > 250);
+        final originalQueue = music.playlist.tracks.map((t) => t.id).toList();
+        await tester.pumpWidget(
+          MaterialApp(theme: appTheme(), home: PlayerSheet(app)),
+        );
+        await tester.pumpAndSettle();
+        expect(app.scoreFor(b), 9);
+        expect(find.byKey(ValueKey('favorite:${b.id}')), findsNothing);
+        final before = music.position;
+        await tester.tap(find.byTooltip('Плюс один: ${b.title}'));
+        await clips.until(() => app.scoreFor(b) == 10);
+        await app.syncLibraryAdds();
+        await tester.pumpAndSettle();
+        expect(app.isFavorite(b.id), true);
+        expect(api.state.likes, contains(b.id));
+        expect(api.state.writes, 1);
+        expect(music.player.playing, true);
+        expect(music.position, greaterThanOrEqualTo(before));
+        expect(music.playlist.tracks.map((t) => t.id), originalQueue);
+        expect(music.playlist.index, 0);
+        expect(find.byType(SnackBar), findsNothing);
+        expect(music.playbackState.value.controls, hasLength(5));
+        expect(
+          music.playbackState.value.controls
+              .where((c) => c.customAction != null)
+              .map((c) => c.label),
+          ['Минус 1 балл', 'Плюс 1 балл'],
+        );
+        expect(
+          await music.customAction('zvuk.favorite.add:0:score-ui:${b.id}'),
+          false,
+        );
+        await tester.tap(find.byTooltip('Минус один: ${b.title}'));
+        await tester.pumpAndSettle();
+        expect(app.scoreFor(b), 9);
+        expect(app.isFavorite(b.id), true);
+        expect(api.state.writes, 1);
+        await music.pause();
+        await app.vote(b, -1);
+        await app.vote(b, -1);
+        await tester.pumpWidget(ZvukApp(app));
+        await tester.pumpAndSettle();
+        await binding.convertFlutterSurfaceToImage();
+        await tester.pump();
+        expect(app.visibleTracks.map((t) => t.id), [a.id, b.id]);
+        expect(find.text('Мой порядок'), findsNothing);
+        expect(find.text('Без оценок'), findsNothing);
+        expect(find.textContaining('Старт'), findsNothing);
+        expect(find.byKey(ValueKey('favorite:${a.id}')), findsNothing);
+        expect(
+          tester.getSize(find.byType(TrackTile).first).height,
+          lessThanOrEqualTo(80),
+        );
+        await binding.takeScreenshot('v140-score-library-normal');
+        tester.platformDispatcher.textScaleFactorTestValue = 1.6;
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        await binding.takeScreenshot('v140-score-library-large');
+        await tester.tap(find.byKey(const Key('shuffle-list')));
+        await tester.pumpAndSettle();
+        final slider = tester.widget<RangeSlider>(
+          find.byKey(const Key('shuffle-score-slider')),
+        );
+        expect(slider.values, const RangeValues(7, 9));
+        final sliderBox = tester.getRect(
+          find.byKey(const Key('shuffle-score-slider')),
+        );
+        await tester.dragFrom(
+          Offset(sliderBox.left + 24, sliderBox.center.dy),
+          Offset((sliderBox.width - 48) / 2, 0),
+        );
+        await tester.pumpAndSettle();
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+        await tester.pumpAndSettle();
+        expect(find.text('Подходит 1 трек'), findsOneWidget);
+        expect(
+          tester.widget<Text>(find.byKey(const Key('shuffle-min'))).data,
+          '8',
+        );
+        expect(
+          tester.widget<Text>(find.byKey(const Key('shuffle-max'))).data,
+          '9',
+        );
+        await binding.takeScreenshot('v140-score-range-large');
+        await tester.tap(find.byKey(const Key('start-shuffle')));
+        await tester.pump();
+        await clips.until(() => music.player.playing && !music.loading);
+        expect(music.playlist.tracks.single.id, a.id);
+        expect(music.isShuffled, true);
+        await music.pause();
+        expect(tester.takeException(), isNull);
+        print(
+          'SCORE UI: new song 9 -> 10 and collected once; minus keeps membership; playback preserved; no hearts/manual/unrated; compact rows and two-thumb range passed',
+        );
+      } finally {
+        tester.platformDispatcher.clearTextScaleFactorTestValue();
+        await tester.pumpWidget(const SizedBox());
+        app.dispose();
+        await music.disposeHandler();
+        api.close();
+        await server.close(force: true);
+        await store.close();
+        await dir.delete(recursive: true);
       }
-      await music.initialize();
-      await music.configure('favorite-ui', api);
-      await music.player.setVolume(0);
-      await music.playList([a, b], 0);
-      await music.pause();
-      await music.seek(const Duration(seconds: 5));
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-      final position = music.position;
-      final source = music.player.sequence.first;
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: appTheme(),
-          home: Builder(
-            builder: (context) => Scaffold(
-              body: SafeArea(
-                child: Column(
-                  children: [
-                    TrackTile(
-                      track: a,
-                      app: app,
-                      onPlay: () => fail('Favorite must not play'),
-                    ),
-                    TrackTile(
-                      track: b,
-                      app: app,
-                      onPlay: () => fail('Favorite must not play'),
-                    ),
-                    TextButton(
-                      onPressed: () => openPlayer(context, app),
-                      child: const Text('Открыть плеер'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await binding.convertFlutterSurfaceToImage();
-      await tester.pump();
-      checkHeart(a, true);
-      checkHeart(b, false);
-      expect(
-        tester.getSize(find.byType(TrackTile).first).height,
-        lessThanOrEqualTo(60),
-      );
-      await binding.takeScreenshot('v112-01-hearts');
-
-      api.state.hold = Completer<void>();
-      await tester.tap(heart(b));
-      await tester.pump();
-      await clips.until(() => app.serverBusy);
-      await tester.pump();
-      await tester.tap(heart(b));
-      await tester.pump();
-      expect(api.state.writes, 1);
-      api.state.hold!.complete();
-      api.state.hold = null;
-      await settleEdit();
-      checkHeart(b, true);
-      expect(find.byType(SnackBar), findsNothing);
-
-      await tester.tap(find.text('Открыть плеер'));
-      await tester.pumpAndSettle();
-      expect(find.byType(Scrollable), findsNothing);
-      api.state.failRead = true;
-      await tester.tap(heart(a));
-      await tester.pump();
-      await settleEdit();
-      checkHeart(a, false);
-      expect(
-        (await store.loadTracks('favorite-ui', 'favorites')).map((t) => t.id),
-        [b.id],
-      );
-      expect(app.scoreFor(a), -3);
-      expect((await store.ratings('favorite-ui'))[a.id]!.score, -3);
-      expect(await store.loadOrder('favorite-ui', 'fixture-playlist'), [
-        b.id,
-        a.id,
-      ]);
-      expect(music.player.sequence.first, same(source));
-      expect(music.playlist.tracks.map((t) => t.id), [a.id, b.id]);
-      expect(music.position, position);
-      expect(music.player.playing, false);
-      expect(find.byType(SnackBar), findsNothing);
-      await binding.takeScreenshot('v112-02-player-heart');
-      tester.platformDispatcher.textScaleFactorTestValue = 1.6;
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      expect(heart(a).hitTestable(), findsOneWidget);
-      expect(find.byType(Scrollable), findsNothing);
-      await binding.takeScreenshot('v112-03-player-large-text');
-      tester.platformDispatcher.clearTextScaleFactorTestValue();
-      api.state.failRead = false;
-      api.state.failWrite = true;
-      await tester.tap(heart(a));
-      await tester.pump();
-      await settleEdit();
-      checkHeart(a, false);
-      expect(find.byType(SnackBar), findsOneWidget);
-      await tester.tap(find.byTooltip('Свернуть плеер'));
-      await tester.pumpAndSettle();
-      checkHeart(a, false);
-      checkHeart(b, true);
-      tester.platformDispatcher.textScaleFactorTestValue = 1.6;
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-      await binding.takeScreenshot('v112-04-hearts-large-text');
-      tester.platformDispatcher.clearTextScaleFactorTestValue();
-      await tester.longPress(find.text(b.title));
-      await tester.pumpAndSettle();
-      expect(find.text('В конец очереди'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-      print(
-        'FAVORITE UI: narrow rows, full player, large text, duplicate tap, API failure, committed cache, quiet success, negative votes and playback preservation passed',
-      );
-    } finally {
-      tester.platformDispatcher.clearTextScaleFactorTestValue();
-      await tester.pumpWidget(const SizedBox());
-      app.dispose();
-      await music.disposeHandler();
-      api.close();
-      await server.close(force: true);
-      await store.close();
-      await dir.delete(recursive: true);
-    }
-  }, timeout: const Timeout(Duration(minutes: 3)));
+    },
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
 }

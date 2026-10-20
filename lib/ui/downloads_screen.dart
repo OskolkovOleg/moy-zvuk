@@ -17,7 +17,6 @@ class DownloadsScreen extends StatefulWidget {
 }
 
 class _DownloadsScreenState extends State<DownloadsScreen> {
-  bool ranked = true;
   Future<void> clear() async {
     final yes = await showDialog<bool>(
       context: context,
@@ -53,23 +52,27 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
 
   Future<void> shuffle(List<Track> tracks) async {
     final app = widget.app;
-    final count = await showModalBottomSheet<int>(
+    final account = app.account?.id,
+        ratings = Map<String, Rating>.of(app.ratings);
+    final range = await showModalBottomSheet<ScoreRange>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
       builder: (_) => ShuffleSheet(
         tracks: List.of(tracks),
-        ratings: Map.of(app.ratings),
+        ratings: ratings,
         title: 'Скачанное',
       ),
     );
-    if (count == null) return;
-    await app.music.playList(
-      shuffledTracks(tracks, app.ratings, bestCount: count == 0 ? null : count),
-      0,
-      title: 'Скачанное',
-      shuffled: true,
+    if (range == null || account != app.account?.id) return;
+    final selected = shuffledTracks(
+      tracks,
+      ratings,
+      minScore: range.min,
+      maxScore: range.max,
     );
+    if (selected.isEmpty) return;
+    await app.music.playList(selected, 0, title: 'Скачанное', shuffled: true);
   }
 
   @override
@@ -78,9 +81,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     return AnimatedBuilder(
       animation: Listenable.merge([app, downloads]),
       builder: (context, _) {
-        final tracks = ranked
-            ? rankedTracks(downloads.tracks, app.ratings)
-            : downloads.tracks;
+        final tracks = rankedTracks(downloads.tracks, app.ratings);
         final transfers = downloads.items
             .where((item) => item.state != DownloadState.ready)
             .toList();
@@ -143,13 +144,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                             icon: const Icon(Icons.shuffle_rounded),
                             label: const Text('Перемешать'),
                           ),
-                          if (tracks.isNotEmpty)
-                            FilterChip(
-                              label: const Text('По баллам'),
-                              selected: ranked,
-                              onSelected: (value) =>
-                                  setState(() => ranked = value),
-                            ),
                         ],
                       ),
                     ],
@@ -244,7 +238,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                   itemBuilder: (context, index) => TrackTile(
                     app: app,
                     track: tracks[index],
-                    showRatings: true,
                     onPlay: () =>
                         app.music.playList(tracks, index, title: 'Скачанное'),
                   ),

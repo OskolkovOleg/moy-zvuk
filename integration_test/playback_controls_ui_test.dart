@@ -61,8 +61,7 @@ void main() {
       );
       final app = AppController(store, music)
         ..account = const Account('fixture', 'Тест')
-        ..tracks = tracks
-        ..ranked = true;
+        ..tracks = tracks;
       Future<void> visibleTap(Finder finder) async {
         await tester.ensureVisible(finder);
         await tester.tap(finder);

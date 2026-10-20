@@ -37,8 +37,8 @@ class LibraryScreen extends StatelessWidget {
               child: ListView(
                 children: [
                   ListTile(
-                    leading: const Icon(Icons.favorite_rounded),
-                    title: const Text('Любимое'),
+                    leading: const Icon(Icons.library_music_rounded),
+                    title: const Text('Мои песни'),
                     selected: app.listId == 'favorites',
                     onTap: () {
                       Navigator.pop(sheetContext);
@@ -80,12 +80,12 @@ class LibraryScreen extends StatelessWidget {
       key: const Key('play-from-top'),
       onPressed: tracks.isEmpty ? null : () => app.playVisible(),
       icon: const Icon(Icons.play_arrow_rounded, size: 22),
-      label: const Text('Слушать сверху'),
+      label: const Text('Слушать'),
     );
     return RefreshIndicator(
       onRefresh: app.refresh,
       child: CustomScrollView(
-        key: PageStorageKey('library:${app.listId}:${app.ranked}'),
+        key: PageStorageKey('library:${app.listId}'),
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverToBoxAdapter(
@@ -193,8 +193,8 @@ class LibraryScreen extends StatelessWidget {
                                   app.listTitle,
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 30,
+                                  style: TextStyle(
+                                    fontSize: largeText ? 24 : 30,
                                     fontWeight: FontWeight.w700,
                                     height: 1.15,
                                   ),
@@ -226,75 +226,7 @@ class LibraryScreen extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 18),
-                      SizedBox(
-                        width: double.infinity,
-                        child: SegmentedButton<bool>(
-                          showSelectedIcon: false,
-                          style: ButtonStyle(
-                            visualDensity: VisualDensity.standard,
-                            textStyle: const WidgetStatePropertyAll(
-                              TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            side: WidgetStatePropertyAll(
-                              BorderSide(color: scheme.outlineVariant),
-                            ),
-                            backgroundColor: WidgetStateProperty.resolveWith(
-                              (s) => s.contains(WidgetState.selected)
-                                  ? scheme.surfaceContainerHighest
-                                  : scheme.surface,
-                            ),
-                            foregroundColor: WidgetStateProperty.resolveWith(
-                              (s) => s.contains(WidgetState.selected)
-                                  ? scheme.onSurface
-                                  : scheme.onSurfaceVariant,
-                            ),
-                          ),
-                          segments: const [
-                            ButtonSegment(
-                              value: false,
-                              label: Text('Мой порядок'),
-                              icon: Icon(Icons.swap_vert_rounded, size: 18),
-                            ),
-                            ButtonSegment(
-                              value: true,
-                              label: Text('По баллам'),
-                              icon: Icon(
-                                Icons.favorite_outline_rounded,
-                                size: 18,
-                              ),
-                            ),
-                          ],
-                          selected: {app.ranked},
-                          onSelectionChanged: (value) =>
-                              app.setSort(value.first),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      if (app.ranked) ...[
-                        FilterChip(
-                          label: const Text('Без оценок'),
-                          selected: app.unrated,
-                          onSelected: app.setUnrated,
-                        ),
-                        Text(
-                          'Старт — 10 баллов. Минус не удаляет песню.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ] else
-                        Text(
-                          '↑ ↓ меняют соседние песни местами',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
+                      const SizedBox(height: 12),
                     ],
                   ),
                 ),
@@ -312,10 +244,8 @@ class LibraryScreen extends StatelessWidget {
               hasScrollBody: false,
               child: EmptyState(
                 icon: Icons.library_music_outlined,
-                title: app.unrated ? 'Всё уже оценено' : 'Здесь пока тихо',
-                message: app.unrated
-                    ? 'Выключи фильтр, чтобы увидеть все треки.'
-                    : 'Потяни вниз, чтобы обновить библиотеку, или выбери другой плейлист.',
+                title: 'Здесь пока тихо',
+                message: 'Потяни вниз, чтобы обновить библиотеку, или выбери другой плейлист.',
               ),
             )
           else
@@ -326,8 +256,6 @@ class LibraryScreen extends StatelessWidget {
                 itemBuilder: (_, index) => TrackTile(
                   track: tracks[index],
                   app: app,
-                  orderIndex: index,
-                  orderLength: tracks.length,
                   onPlay: () => app.playVisible(index: index),
                 ),
               ),

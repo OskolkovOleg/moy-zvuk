@@ -110,8 +110,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                     style: TextButton.styleFrom(
                       foregroundColor: scheme.onPrimaryContainer,
                     ),
-                    icon: const Icon(Icons.favorite_border_rounded),
-                    label: const Text('Поток по любимому'),
+                    icon: const Icon(Icons.library_music_rounded),
+                    label: const Text('Поток по моим песням'),
                   ),
                   ValueListenableBuilder(
                     valueListenable: widget.app.music.error,

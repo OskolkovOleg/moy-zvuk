@@ -6,6 +6,8 @@ import 'package:uuid/uuid.dart';
 
 import 'models.dart';
 
+part 'score_store.dart';
+
 class LibraryStore {
   LibraryStore(this.db);
   final Database db;
@@ -21,7 +23,7 @@ class LibraryStore {
     final db = await f.openDatabase(
       location,
       options: OpenDatabaseOptions(
-        version: 2,
+        version: 3,
         onCreate: (db, _) async {
           await db.execute(
             'CREATE TABLE votes (account TEXT NOT NULL, id TEXT NOT NULL, track TEXT NOT NULL, delta INTEGER NOT NULL CHECK(delta IN (-1,1)), created TEXT NOT NULL, undone INTEGER NOT NULL DEFAULT 0 CHECK(undone IN (0,1)), metadata TEXT NOT NULL, PRIMARY KEY(account,id))',
@@ -31,9 +33,11 @@ class LibraryStore {
             'CREATE TABLE state (account TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY(account,key))',
           );
           await _createDownloads(db);
+          await _createScoreData(db);
         },
         onUpgrade: (db, oldVersion, _) async {
           if (oldVersion < 2) await _createDownloads(db);
+          if (oldVersion < 3) await _createScoreData(db, legacy: true);
         },
       ),
     );
@@ -44,19 +48,34 @@ class LibraryStore {
     'CREATE TABLE downloads (account TEXT NOT NULL, track TEXT NOT NULL, metadata TEXT NOT NULL, file TEXT NOT NULL, state TEXT NOT NULL, bytes INTEGER NOT NULL, created TEXT NOT NULL, error TEXT, PRIMARY KEY(account,track))',
   );
 
-  Future<String> vote(String account, Track track, int delta) async {
+  Future<String> vote(
+    String account,
+    Track track,
+    int delta, {
+    bool addToLibrary = false,
+  }) async {
     if (delta != -1 && delta != 1) {
       throw ArgumentError('Оценка должна быть +1 или −1');
     }
     final id = const Uuid().v4();
-    await db.insert('votes', {
-      'account': account,
-      'id': id,
-      'track': track.id,
-      'delta': delta,
-      'created': DateTime.now().toUtc().toIso8601String(),
-      'undone': 0,
-      'metadata': jsonEncode(track.toJson()),
+    await db.transaction((txn) async {
+      await txn.insert('score_bases', {
+        'account': account,
+        'track': track.id,
+        'base': initialTrackScore,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      await txn.insert('votes', {
+        'account': account,
+        'id': id,
+        'track': track.id,
+        'delta': delta,
+        'created': DateTime.now().toUtc().toIso8601String(),
+        'undone': 0,
+        'metadata': jsonEncode(track.toJson()),
+      });
+      if (addToLibrary && delta > 0) {
+        await _collectTrack(txn, account, track);
+      }
     });
     return id;
   }
@@ -72,13 +91,13 @@ class LibraryStore {
 
   Future<Map<String, Rating>> ratings(String account) async {
     final rows = await db.rawQuery(
-      'SELECT track, SUM(delta) AS score, COUNT(*) AS count FROM votes WHERE account=? AND undone=0 GROUP BY track',
+      'SELECT b.track, b.base + COALESCE(v.score,0) AS score, COALESCE(v.count,0) AS count FROM score_bases b LEFT JOIN (SELECT account,track,SUM(delta) AS score,COUNT(*) AS count FROM votes WHERE undone=0 GROUP BY account,track) v ON v.account=b.account AND v.track=b.track WHERE b.account=?',
       [account],
     );
     return {
       for (final row in rows)
         row['track'] as String: Rating(
-          initialTrackScore + (row['score'] as int),
+          row['score'] as int,
           row['count'] as int,
         ),
     };
@@ -126,9 +145,15 @@ class LibraryStore {
       where: 'account=? AND key LIKE ?',
       whereArgs: [account, 'order:%'],
     );
+    final bases = await db.query(
+      'score_bases',
+      where: 'account=?',
+      whereArgs: [account],
+    );
     return const JsonEncoder.withIndent('  ').convert({
-      'version': 1,
+      'version': 2,
       'account': account,
+      'baselines': {for (final row in bases) row['track']: row['base']},
       'orders': {
         for (final row in orders)
           (row['key'] as String).substring(6): jsonDecode(
@@ -161,14 +186,31 @@ class LibraryStore {
       throw const FormatException('Не удалось прочитать JSON');
     }
     if (raw is! Map ||
-        raw['version'] != 1 ||
+        ![1, 2].contains(raw['version']) ||
         raw['account'] != account ||
         raw['events'] is! List) {
       throw const FormatException(
-        'Нужна резервная копия версии 1 для этого аккаунта',
+        'Нужна резервная копия баллов для этого аккаунта',
       );
     }
     final events = <Map<String, Object?>>[];
+    final Map<String, int> bases;
+    if (raw['version'] == 2) {
+      final values = raw['baselines'];
+      if (values is! Map ||
+          values.entries.any(
+            (e) =>
+                e.key is! String ||
+                (e.key as String).isEmpty ||
+                e.value is! int ||
+                ![9, 10].contains(e.value),
+          )) {
+        throw const FormatException('В копии повреждены начальные баллы');
+      }
+      bases = Map<String, int>.from(values);
+    } else {
+      bases = {};
+    }
     final orders = raw['orders'] ?? <String, dynamic>{};
     if (orders is! Map ||
         orders.entries.any(
@@ -203,6 +245,11 @@ class LibraryStore {
       if (track.id != e['track']) {
         throw const FormatException('ID трека не совпадает');
       }
+      if (raw['version'] == 1) {
+        bases[track.id] = 10;
+      } else if (!bases.containsKey(track.id)) {
+        throw const FormatException('В копии отсутствует начальный балл песни');
+      }
       events.add({
         'account': account,
         'id': e['id'],
@@ -214,6 +261,13 @@ class LibraryStore {
       });
     }
     return db.transaction((txn) async {
+      for (final entry in bases.entries) {
+        await txn.insert('score_bases', {
+          'account': account,
+          'track': entry.key,
+          'base': entry.value,
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      }
       var added = 0;
       for (final event in events) {
         final existing = await txn.query(

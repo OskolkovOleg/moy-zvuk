@@ -80,14 +80,6 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
   }
 
   Map<String, Rating> _notificationRatings = {};
-  Set<String> _notificationFavorites = {};
-  final Set<String> _pendingFavorites = {};
-
-  void setNotificationFavorites(String account, List<Track> favorites) {
-    if (_account != account) return;
-    _notificationFavorites = favorites.map((t) => t.id).toSet();
-    _broadcast();
-  }
 
   void setNotificationRatings(String account, Map<String, Rating> ratings) {
     if (_account != account) return;
@@ -104,8 +96,6 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
   final revision = ValueNotifier<int>(0);
   Future<void> Function(String account, Track track, int delta)?
   onNotificationVote;
-  Future<bool> Function(String account, Track track, bool liked)?
-  onNotificationFavorite;
   String sourceTitle = 'Очередь';
   bool isShuffled = false, isWave = false;
   AudioServiceRepeatMode repeatMode = AudioServiceRepeatMode.none;
@@ -356,10 +346,6 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     _api = api;
     _account = account;
     _notificationRatings = await store.ratings(account);
-    _notificationFavorites = (await store.loadTracks(
-      account,
-      'favorites',
-    )).map((t) => t.id).toSet();
     _loaded = false;
     _historyRecorded = false;
     playlist.replace([], 0);
@@ -465,9 +451,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
 
   @override
   Future<dynamic> customAction(String name, [Map<String, dynamic>? extras]) =>
-      name.startsWith('zvuk.favorite.')
-      ? _favoriteFromNotification(name)
-      : _rateFromNotification(name);
+      _rateFromNotification(name);
 
   Future<void> _save() async {
     final account = _account;

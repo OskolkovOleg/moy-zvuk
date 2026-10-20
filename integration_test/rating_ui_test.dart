@@ -51,7 +51,6 @@ void main() {
       await app.vote(a, 1);
       await app.vote(a, 1);
       await app.vote(c, 1);
-      await app.setSort(true);
       // UI fixture: the shuffled queue starts with the lowest-ranked song.
       music.playlist.replace([b, a], 0);
       music.isShuffled = true;
@@ -63,7 +62,7 @@ void main() {
         await tester.pumpAndSettle();
         await binding.convertFlutterSurfaceToImage();
         await tester.pump();
-        expect(app.scoreFor(b), 10);
+        expect(app.scoreFor(b), 9);
         expect(find.text('Твой счёт'), findsNothing);
         expect(
           tester.getSize(find.byType(TrackTile).first).height,
@@ -83,14 +82,10 @@ void main() {
         expect(find.text('№ 3 по баллам'), findsOneWidget);
         await binding.takeScreenshot('v130-01-compact-library');
 
-        app.setUnrated(true);
-        await tester.pumpAndSettle();
-        expect(app.visibleTracks, [b]);
         await tester.tap(find.byTooltip('Минус один: ${b.title}'));
         await tester.pumpAndSettle();
-        expect(app.unrated, false);
         expect(app.visibleTracks, hasLength(3));
-        expect(app.scoreFor(b), 9);
+        expect(app.scoreFor(b), 8);
         expect(find.byType(SnackBar), findsNothing);
         expect(music.error.value, isNull);
         ScaffoldMessenger.of(tester.element(find.byType(TrackTile).first))
@@ -112,7 +107,7 @@ void main() {
           );
           await tester.pumpAndSettle();
         }
-        expect(app.scoreFor(b), 13);
+        expect(app.scoreFor(b), 12);
         expect(find.byType(SnackBar), findsNothing);
         expect(find.byType(SingleChildScrollView), findsNothing);
         expect(find.text('Далее'), findsNothing);
@@ -125,7 +120,7 @@ void main() {
           await app.vote(b, -1);
         }
         await tester.pumpAndSettle();
-        expect(app.scoreFor(b), -1);
+        expect(app.scoreFor(b), -2);
         expect(find.text('№ 3 из 3 по баллам'), findsOneWidget);
         expect(app.visibleTracks, hasLength(3));
         expect(
@@ -136,11 +131,9 @@ void main() {
         expect(music.playlist.index, 0);
 
         app.tracks = [a, c];
-        await app.setSort(false);
         await tester.pumpAndSettle();
         expect(find.text('Нет в текущем списке'), findsOneWidget);
         app.tracks = [c, a, b];
-        await app.setSort(true);
         tester.platformDispatcher.textScaleFactorTestValue = 1.6;
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);

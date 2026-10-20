@@ -132,7 +132,7 @@ class Rating {
 }
 
 // A fixed baseline, not a vote: reopening or importing must never add it again.
-const initialTrackScore = 10;
+const initialTrackScore = 9;
 
 int trackScore(String id, Map<String, Rating> ratings) =>
     ratings[id]?.score ?? initialTrackScore;
@@ -152,50 +152,14 @@ RatingPosition? ratingPosition(
   return index < 0 ? null : RatingPosition(index + 1, sorted.length);
 }
 
-/// Keep saved positions, drop missing entries and append new songs in source
-/// order. Consume each occurrence once: playlists may contain duplicates.
-List<Track> manuallyOrderedTracks(List<Track> source, List<String> order) {
-  final byId = <String, List<Track>>{};
-  for (final track in source) {
-    byId.putIfAbsent(track.id, () => []).add(track);
-  }
-  final used = <String, int>{};
-  final result = <Track>[];
-  for (final id in order) {
-    final index = used[id] ?? 0;
-    final copies = byId[id];
-    if (copies != null && index < copies.length) {
-      result.add(copies[index]);
-      used[id] = index + 1;
-    }
-  }
-  final seen = <String, int>{};
-  for (final track in source) {
-    final occurrence = seen.update(track.id, (n) => n + 1, ifAbsent: () => 1);
-    if (occurrence > (used[track.id] ?? 0)) result.add(track);
-  }
-  return result;
-}
-
-List<Track> rankedTracks(
-  List<Track> tracks,
-  Map<String, Rating> ratings, {
-  bool ranked = true,
-  bool unrated = false,
-}) {
-  final indexed = tracks
-      .asMap()
-      .entries
-      .where((e) => !unrated || (ratings[e.value.id]?.count ?? 0) == 0)
-      .toList();
-  if (ranked) {
-    indexed.sort((a, b) {
-      final score = trackScore(
-        b.value.id,
-        ratings,
-      ).compareTo(trackScore(a.value.id, ratings));
-      return score != 0 ? score : a.key.compareTo(b.key);
-    });
-  }
+List<Track> rankedTracks(List<Track> tracks, Map<String, Rating> ratings) {
+  final indexed = tracks.asMap().entries.toList();
+  indexed.sort((a, b) {
+    final score = trackScore(
+      b.value.id,
+      ratings,
+    ).compareTo(trackScore(a.value.id, ratings));
+    return score != 0 ? score : a.key.compareTo(b.key);
+  });
   return indexed.map((e) => e.value).toList();
 }

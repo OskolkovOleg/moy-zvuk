@@ -57,8 +57,7 @@ void main() {
     );
     final app = AppController(store, music)
       ..account = const Account('notification-rating', 'Тест')
-      ..tracks = [a, b]
-      ..ranked = true;
+      ..tracks = [a, b];
     const bridge = MethodChannel('zvuk.test');
     Future<Map<dynamic, dynamic>> notification() async =>
         (await bridge.invokeMapMethod<dynamic, dynamic>('notification'))!;
@@ -73,11 +72,7 @@ void main() {
       final info = await notification();
       expect(info['present'], true);
       expect(info['foreground'], true);
-      expect(info['customLabels'], [
-        'В любимое',
-        'Минус 1 балл',
-        'Плюс 1 балл',
-      ]);
+      expect(info['customLabels'], ['Минус 1 балл', 'Плюс 1 балл']);
       expect(
         (info['customIcons'] as List).every((id) => (id as int) > 0),
         true,
@@ -87,8 +82,8 @@ void main() {
       expect(info['hasCustomView'], false);
       expect(info['hasArtwork'], true);
       expect((info['actions'] as List).contains('Stop'), false);
-      expect(info['ratingScore'], 10);
-      expect(info['subtitle'], contains('Баллы: 10'));
+      expect(info['ratingScore'], 9);
+      expect(info['subtitle'], contains('Баллы: 9'));
       Future<void> press(String label) => bridge.invokeMethod<void>(
         sdk < 33 ? 'notificationAction' : 'customMediaAction',
         label,
@@ -96,11 +91,11 @@ void main() {
 
       // Real notification PendingIntent on older Android, MediaSession on 13+.
       await press('Плюс 1 балл');
-      await clips.until(() => app.scoreFor(a) == 11);
+      await clips.until(() => app.scoreFor(a) == 10);
       await Future<void>.delayed(const Duration(milliseconds: 500));
       final afterVote = await notification();
-      expect(afterVote['ratingScore'], 11);
-      expect(afterVote['subtitle'], contains('Баллы: 11'));
+      expect(afterVote['ratingScore'], 10);
+      expect(afterVote['subtitle'], contains('Баллы: 10'));
       expect(afterVote['hasArtwork'], true);
       expect(music.player.playing, true);
       await bridge.invokeMethod<void>(
@@ -116,32 +111,32 @@ void main() {
       for (var i = 0; i < 2; i++) {
         await press('Минус 1 балл');
       }
-      await clips.until(() => app.scoreFor(a) == 12);
+      await clips.until(() => app.scoreFor(a) == 11);
       await Future<void>.delayed(const Duration(milliseconds: 500));
-      expect((await notification())['ratingScore'], 12);
+      expect((await notification())['ratingScore'], 11);
       expect(music.player.playing, false);
       expect(music.position, pausedAt);
       expect(music.playlist.index, 0);
       expect(music.playlist.tracks.map((t) => t.id), [a.id, b.id]);
-      expect(app.scoreFor(b), 10);
-      expect((await store.ratings(app.account!.id))[a.id]!.score, 12);
+      expect(app.scoreFor(b), 9);
+      expect((await store.ratings(app.account!.id))[a.id]!.score, 11);
       expect(find.byType(SnackBar), findsNothing);
       await app.vote(a, -1);
       await press('Плюс 1 балл');
-      await clips.until(() => app.scoreFor(a) == 12);
+      await clips.until(() => app.scoreFor(a) == 11);
       print('NOTIFICATION_RATING_CAPTURE_READY SDK=$sdk');
-      await Future<void>.delayed(const Duration(seconds: 20));
+      await Future<void>.delayed(const Duration(seconds: 2));
 
       final stale = music.playbackState.value.controls.last.customAction!.name;
       await music.skipToNext();
       await music.pause();
       expect(await music.customAction(stale), false);
       expect(await music.customAction('unknown'), false);
-      expect(app.scoreFor(a), 12);
-      expect(app.scoreFor(b), 10);
+      expect(app.scoreFor(a), 11);
+      expect(app.scoreFor(b), 9);
       await Future<void>.delayed(const Duration(milliseconds: 400));
       await press('Минус 1 балл');
-      await clips.until(() => app.scoreFor(b) == 9);
+      await clips.until(() => app.scoreFor(b) == 8);
 
       app.account = const Account('other-account', 'Другой');
       app.ratings = {};
@@ -152,12 +147,24 @@ void main() {
         false,
       );
       await music.playList([a], 0);
+      await clips.until(() => music.position.inMilliseconds > 150);
       await music.pause();
-      await Future<void>.delayed(const Duration(milliseconds: 400));
+      final deadline = DateTime.now().add(const Duration(seconds: 15));
+      Map<dynamic, dynamic> switched = {};
+      while (DateTime.now().isBefore(deadline)) {
+        switched = await notification();
+        if (switched['ratingScore'] == 9 &&
+            (switched['actions'] as List? ?? []).contains('Play')) {
+          break;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+      expect(switched['ratingScore'], 9);
+      expect((switched['actions'] as List).contains('Play'), true);
       await press('Плюс 1 балл');
-      await clips.until(() => app.scoreFor(a) == 11);
-      expect((await store.ratings('notification-rating'))[a.id]!.score, 12);
-      expect((await store.ratings('notification-rating'))[b.id]!.score, 9);
+      await clips.until(() => app.scoreFor(a) == 10);
+      expect((await store.ratings('notification-rating'))[a.id]!.score, 11);
+      expect((await store.ratings('notification-rating'))[b.id]!.score, 8);
       expect(music.error.value, isNull);
       print(
         'NOTIFICATION RATINGS API $sdk: native actions, background, pause, accumulation, persistence, stale action and account isolation passed',

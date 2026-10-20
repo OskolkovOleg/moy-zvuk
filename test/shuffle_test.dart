@@ -8,42 +8,52 @@ void main() {
   const a = Track(id: 'a', title: 'A'),
       b = Track(id: 'b', title: 'B'),
       c = Track(id: 'c', title: 'C');
-  test('Top N is selected by descending score before randomization', () {
-    final source = [a, b, c];
-    final ratings = {'a': const Rating(7, 3), 'c': const Rating(18, 8)};
-    for (var seed = 0; seed < 12; seed++) {
-      final result = shuffledTracks(
-        source,
-        ratings,
-        bestCount: 2,
-        random: Random(seed),
-      );
-      expect(result.map((t) => t.id), unorderedEquals(['b', 'c']));
-    }
-    expect(source, [a, b, c]);
-    expect(shuffledTracks(source, ratings, bestCount: 1).single, c);
-  });
   test(
-    'All-track shuffle preserves occurrences and leaves source untouched',
+    'Inclusive score range is selected before shuffling, including defaults',
     () {
-      final source = [a, b, a, c];
-      final orders = <String>{};
+      final source = [a, b, c];
+      final ratings = {'a': const Rating(-2, 11), 'c': const Rating(18, 9)};
       for (var seed = 0; seed < 12; seed++) {
-        final result = shuffledTracks(source, {}, random: Random(seed));
-        expect(result, unorderedEquals(source));
-        orders.add(result.map((t) => t.id).join());
+        expect(
+          shuffledTracks(
+            source,
+            ratings,
+            minScore: -2,
+            maxScore: 9,
+            random: Random(seed),
+          ),
+          unorderedEquals([a, b]),
+        );
       }
-      expect(orders.length, greaterThan(1));
-      expect(source, [a, b, a, c]);
+      expect(shuffledTracks(source, ratings, minScore: 18, maxScore: 18), [c]);
+      expect(
+        shuffledTracks(source, ratings, minScore: 10, maxScore: 17),
+        isEmpty,
+      );
+      expect(source, [a, b, c]);
     },
   );
-  test('Ties stay stable at cutoff, limits and empty lists are safe', () {
+  test('Shuffle preserves occurrences and leaves source untouched', () {
+    final source = [a, b, a, c], orders = <String>{};
+    for (var seed = 0; seed < 12; seed++) {
+      final result = shuffledTracks(source, {}, random: Random(seed));
+      expect(result, unorderedEquals(source));
+      orders.add(result.map((t) => t.id).join());
+    }
+    expect(orders.length, greaterThan(1));
+    expect(source, [a, b, a, c]);
     expect(
-      shuffledTracks([a, b, c], {}, bestCount: 2),
-      unorderedEquals([a, b]),
+      shuffledTracks(source, {}, minScore: 9, maxScore: 9),
+      unorderedEquals(source),
     );
-    expect(shuffledTracks([a], {}, bestCount: 50), [a]);
-    expect(shuffledTracks([], {}, bestCount: 1), isEmpty);
-    expect(() => shuffledTracks([a], {}, bestCount: 0), throwsArgumentError);
+  });
+  test('Empty, equal scores, one-sided ranges and reversed ranges', () {
+    expect(shuffledTracks([], {}, minScore: 0, maxScore: 0), isEmpty);
+    expect(shuffledTracks([a], {}, minScore: 9), [a]);
+    expect(shuffledTracks([a], {}, maxScore: 8), isEmpty);
+    expect(
+      () => shuffledTracks([a], {}, minScore: 10, maxScore: 9),
+      throwsArgumentError,
+    );
   });
 }

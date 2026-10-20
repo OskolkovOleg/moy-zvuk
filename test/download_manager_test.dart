@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -132,7 +133,7 @@ void main() {
       expect(await manager.localPath('one', a.id), local);
       await manager.remove(a.id);
       expect(await File(local).exists(), false);
-      expect((await store.ratings('one'))[a.id]!.score, 9);
+      expect((await store.ratings('one'))[a.id]!.score, 8);
       expect(await store.loadOrder('one', 'favorites'), ['b', 'a']);
       await manager.clear();
       expect(manager.items, isEmpty);
@@ -360,7 +361,15 @@ void main() {
       ),
     );
     final legacy = LibraryStore(old);
-    await legacy.vote('one', a, -1);
+    await old.insert('votes', {
+      'account': 'one',
+      'id': 'legacy-vote',
+      'track': a.id,
+      'delta': -1,
+      'created': '2026-10-01T00:00:00Z',
+      'undone': 0,
+      'metadata': jsonEncode(a.toJson()),
+    });
     await legacy.put('one', 'queue', {
       'tracks': [a.toJson()],
       'index': 0,
@@ -375,7 +384,7 @@ void main() {
     await manager.configure('one', api);
     expect((await store.ratings('one'))[a.id]!.score, 9);
     expect((await store.get('one', 'queue'))['position'], 1234);
-    expect(await store.db.getVersion(), 2);
+    expect(await store.db.getVersion(), 3);
     await manager.enqueue([
       a,
     ]); // default HTTP cannot reach example; cancelled in teardown

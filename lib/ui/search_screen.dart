@@ -203,7 +203,6 @@ class _SearchScreenState extends State<SearchScreen> {
                       key: ValueKey(hit.key),
                       track: hit.track!,
                       app: widget.app,
-                      catalog: true,
                       onPlay: () {
                         unawaited(search.remember());
                         FocusScope.of(context).unfocus();

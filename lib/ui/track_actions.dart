@@ -56,13 +56,6 @@ Future<void> openTrackActions(
                 Icons.auto_awesome_rounded,
                 'Добавить похожие в очередь',
               ),
-              (
-                'like',
-                app.isFavorite(track.id)
-                    ? Icons.favorite_rounded
-                    : Icons.favorite_border_rounded,
-                app.isFavorite(track.id) ? 'Убрать из любимого' : 'В любимое',
-              ),
               ('playlist', Icons.library_add_outlined, 'В плейлист'),
               ('lyrics', Icons.lyrics_outlined, 'Текст песни'),
               if (track.artists.isNotEmpty || track.artistIds.isNotEmpty)
@@ -111,16 +104,6 @@ Future<void> openTrackActions(
           notify(
             context,
             value == 'next' ? 'Будет следующей' : 'Добавлено в конец очереди',
-          );
-        }
-      case 'like':
-        await app.setFavorite(track, !app.isFavorite(track.id));
-        if (context.mounted) {
-          notify(
-            context,
-            app.isFavorite(track.id)
-                ? 'Добавлено в любимое'
-                : 'Убрано из любимого',
           );
         }
       case 'lyrics':

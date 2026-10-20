@@ -136,32 +136,35 @@ class _ZvukAppState extends State<ZvukApp> with WidgetsBindingObserver {
               ],
             ),
           ),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: tab,
-            onDestinationSelected: (value) => setState(() {
-              tab = value;
-              visited.add(value);
-            }),
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.library_music_outlined),
-                selectedIcon: Icon(Icons.library_music_rounded),
-                label: 'Библиотека',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.explore_outlined),
-                selectedIcon: Icon(Icons.explore_rounded),
-                label: 'Обзор',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.search_rounded),
-                label: 'Поиск',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.queue_music_rounded),
-                label: 'Плейлисты',
-              ),
-            ],
+          bottomNavigationBar: MediaQuery.withClampedTextScaling(
+            maxScaleFactor: 1.1,
+            child: NavigationBar(
+              selectedIndex: tab,
+              onDestinationSelected: (value) => setState(() {
+                tab = value;
+                visited.add(value);
+              }),
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.library_music_outlined),
+                  selectedIcon: Icon(Icons.library_music_rounded),
+                  label: 'Библиотека',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.explore_outlined),
+                  selectedIcon: Icon(Icons.explore_rounded),
+                  label: 'Обзор',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.search_rounded),
+                  label: 'Поиск',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.queue_music_rounded),
+                  label: 'Плейлисты',
+                ),
+              ],
+            ),
           ),
         );
       },

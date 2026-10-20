@@ -6,10 +6,13 @@ void main() {
   const b = Track(id: 'b', title: 'B');
   const c = Track(id: 'c', title: 'C');
 
-  test('Every unvoted song starts at ten, including uncached/new tracks', () {
-    expect(trackScore('new-song', {}), 10);
-    expect(trackScore('a', {'a': const Rating(9, 1)}), 9);
-  });
+  test(
+    'Every new unvoted song starts at nine, including uncached/new tracks',
+    () {
+      expect(trackScore('new-song', {}), 9);
+      expect(trackScore('a', {'a': const Rating(9, 1)}), 9);
+    },
+  );
 
   test(
     'Rating position uses the full list, keeps ties and updates with votes',

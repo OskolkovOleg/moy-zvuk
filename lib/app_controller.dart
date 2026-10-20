@@ -11,27 +11,11 @@ import 'playback/music_handler.dart';
 import 'playback/shuffle_tracks.dart';
 
 part 'personal_controller.dart';
+part 'score_library_controller.dart';
 
 class AppController extends ChangeNotifier {
   AppController(this.store, this.music, {this.tokens = const TokenStore()}) {
     music.onNotificationVote = _voteFromNotification;
-    music.onNotificationFavorite = _favoriteFromNotification;
-  }
-
-  Future<bool> _favoriteFromNotification(
-    String accountId,
-    Track track,
-    bool liked,
-  ) async {
-    final session = api;
-    if (account?.id != accountId || session == null) return false;
-    await setFavorite(track, liked);
-    return account?.id == accountId && api == session;
-  }
-
-  void _publishFavorites() {
-    final id = account?.id;
-    if (id != null) music.setNotificationFavorites(id, favoriteTracks);
   }
 
   Future<void> _voteFromNotification(
@@ -45,13 +29,17 @@ class AppController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     if (music.onNotificationVote == _voteFromNotification) {
       music.onNotificationVote = null;
     }
-    if (music.onNotificationFavorite == _favoriteFromNotification) {
-      music.onNotificationFavorite = null;
-    }
     super.dispose();
+  }
+
+  bool _disposed = false;
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
   }
 
   final LibraryStore store;
@@ -62,10 +50,8 @@ class AppController extends ChangeNotifier {
   List<Track> tracks = [];
   List<PlaylistInfo> playlists = [];
   Map<String, Rating> ratings = {};
-  List<String> manualOrder = [];
-  String listId = 'favorites', listTitle = 'Любимое';
-  bool busy = false, ranked = false, unrated = false, connecting = false;
-  bool reordering = false;
+  String listId = 'favorites', listTitle = 'Мои песни';
+  bool busy = false, connecting = false;
   String? message;
   int _selection = 0, _catalogRevision = 0;
   int libraryRequests = 0;
@@ -83,14 +69,10 @@ class AppController extends ChangeNotifier {
 
   int scoreFor(Track track) => trackScore(track.id, ratings);
 
-  // Rank in the entire selected library list, independent of playback order,
-  // shuffle subset, manual arrangement and the unrated filter.
   RatingPosition? positionFor(Track track) =>
       ratingPosition(tracks, ratings, track.id);
 
-  List<Track> get visibleTracks => ranked
-      ? rankedTracks(tracks, ratings, unrated: unrated)
-      : manuallyOrderedTracks(tracks, manualOrder);
+  List<Track> get visibleTracks => rankedTracks(tracks, ratings);
 
   Future<void> playVisible({int index = 0}) async {
     final snapshot = visibleTracks;
@@ -98,48 +80,27 @@ class AppController extends ChangeNotifier {
     await music.playList(snapshot, index, title: listTitle);
   }
 
-  Future<void> playShuffled({int? bestCount}) async {
-    final snapshot = shuffledTracks(tracks, ratings, bestCount: bestCount);
+  Future<void> playShuffled({
+    int? minScore,
+    int? maxScore,
+    List<Track>? source,
+    Map<String, Rating>? scores,
+  }) async {
+    final snapshot = shuffledTracks(
+      source ?? tracks,
+      scores ?? ratings,
+      minScore: minScore,
+      maxScore: maxScore,
+    );
     if (snapshot.isEmpty) return;
     await music.playList(
       snapshot,
       0,
-      title: bestCount == null
+      title: minScore == null && maxScore == null
           ? listTitle
-          : '$listTitle · топ ${snapshot.length}',
+          : '$listTitle · $minScore–$maxScore баллов',
       shuffled: true,
     );
-  }
-
-  Future<void> moveTrack(int index, int delta) async {
-    if (ranked || reordering || account == null || ![-1, 1].contains(delta)) {
-      return;
-    }
-    final ordered = visibleTracks;
-    final target = index + delta;
-    if (index < 0 ||
-        index >= ordered.length ||
-        target < 0 ||
-        target >= ordered.length) {
-      return;
-    }
-    final accountId = account!.id, selected = listId;
-    final selection = _selection;
-    final item = ordered[index];
-    ordered[index] = ordered[target];
-    ordered[target] = item;
-    final ids = ordered.map((t) => t.id).toList();
-    reordering = true;
-    notifyListeners();
-    try {
-      await store.saveOrder(accountId, selected, ids);
-      if (account?.id == accountId && selection == _selection) {
-        manualOrder = ids;
-      }
-    } finally {
-      reordering = false;
-      notifyListeners();
-    }
   }
 
   Future<void> initialize() async {
@@ -178,12 +139,9 @@ class AppController extends ChangeNotifier {
     savedCatalogError = null;
     savedCatalogLoading = false;
     favoriteTracks = await store.loadTracks(id, 'favorites');
-    _publishFavorites();
     tracks = listId == 'favorites'
         ? favoriteTracks
         : await store.loadTracks(id, listId);
-    manualOrder = await store.loadOrder(id, listId);
-    ranked = await store.get(id, 'sort') == 'rating';
     ratings = await store.ratings(id);
     playlists = ((await store.get(id, 'playlists')) as List? ?? [])
         .map((j) => PlaylistInfo.fromJson(j))
@@ -203,7 +161,7 @@ class AppController extends ChangeNotifier {
       if (changed) {
         ++_selection;
         listId = 'favorites';
-        listTitle = 'Любимое';
+        listTitle = 'Мои песни';
       }
       await store.put('_app', 'account', profile.toJson());
       account = profile;
@@ -236,6 +194,10 @@ class AppController extends ChangeNotifier {
 
   Future<void> refresh() async {
     if (busy || serverBusy || api == null || account == null) return;
+    await syncLibraryAdds();
+    if (_disposed || busy || serverBusy || api == null || account == null) {
+      return;
+    }
     unawaited(refreshSavedCatalog());
     final id = account!.id, selected = listId;
     final requestApi = api!;
@@ -245,19 +207,19 @@ class AppController extends ChangeNotifier {
     message = null;
     notifyListeners();
     try {
-      final favorites = await requestApi.favorites();
+      final remoteFavorites = await requestApi.favorites();
       final lists = await requestApi.playlists();
-      final active = selected == 'favorites'
-          ? favorites
+      final playlistTracks = selected == 'favorites'
+          ? null
           : await requestApi.playlistTracks(selected);
       if (revision != _catalogRevision || account?.id != id) return;
-      await store.saveTracks(id, 'favorites', favorites);
+      final favorites = await store.mergeFavorites(id, remoteFavorites);
+      final active = playlistTracks ?? favorites;
       await store.put(id, 'playlists', lists.map((p) => p.toJson()).toList());
       if (selected != 'favorites') await store.saveTracks(id, selected, active);
       if (account?.id == id) {
         if (revision != _catalogRevision) return;
         favoriteTracks = favorites;
-        _publishFavorites();
         playlists = lists;
         if (selection == _selection) tracks = active;
       }
@@ -277,31 +239,31 @@ class AppController extends ChangeNotifier {
     final id = account!.id;
     final selection = ++_selection;
     listId = playlist?.id ?? 'favorites';
-    listTitle = playlist?.title ?? 'Любимое';
+    listTitle = playlist?.title ?? 'Мои песни';
     final selected = listId;
     final cached = await store.loadTracks(id, selected);
-    final order = await store.loadOrder(id, selected);
     if (selection != _selection || account?.id != id) return;
     tracks = selected == 'favorites' ? favoriteTracks : cached;
-    manualOrder = order;
     notifyListeners();
     if (api == null) return;
     final session = api!, revision = _catalogRevision;
     try {
-      final result = selected == 'favorites'
+      final remote = selected == 'favorites'
           ? await session.favorites()
           : await session.playlistTracks(selected);
       if (revision != _catalogRevision || api != session || account?.id != id) {
         return;
       }
-      await store.saveTracks(id, selected, result);
+      final result = selected == 'favorites'
+          ? await store.mergeFavorites(id, remote)
+          : remote;
+      if (selected != 'favorites') await store.saveTracks(id, selected, result);
       if (selection == _selection &&
           account?.id == id &&
           revision == _catalogRevision) {
         tracks = result;
         if (selected == 'favorites') {
           favoriteTracks = result;
-          _publishFavorites();
         }
         message = null;
       }
@@ -323,35 +285,19 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setSort(bool value) async {
-    ranked = value;
-    if (!ranked) unrated = false;
-    notifyListeners();
-    if (account == null) return;
-    try {
-      await store.put(account!.id, 'sort', value ? 'rating' : 'manual');
-    } catch (_) {
-      message = 'Режим сортировки не сохранился. Попробуй снова.';
-      notifyListeners();
-    }
-  }
-
-  void setUnrated(bool value) {
-    unrated = value;
-    notifyListeners();
-  }
-
   Future<String> vote(Track track, int delta) async {
     final id = account!.id;
-    final event = await store.vote(id, track, delta);
+    ++_catalogRevision;
+    final event = await store.vote(id, track, delta, addToLibrary: delta > 0);
     final updated = await store.ratings(id);
-    if (account?.id == id) {
+    final favorites = await store.loadTracks(id, 'favorites');
+    if (account?.id == id && !_disposed) {
       ratings = updated;
+      favoriteTracks = favorites;
+      if (listId == 'favorites') tracks = favorites;
       music.setNotificationRatings(id, ratings);
-      // Keep the song visible after its first vote rather than hiding it in
-      // the unrated-only view. Votes never alter library membership or queue.
-      unrated = false;
       notifyListeners();
+      if (delta > 0) unawaited(syncLibraryAdds());
     }
     return event;
   }
@@ -371,9 +317,6 @@ class AppController extends ChangeNotifier {
     if (account?.id == id) {
       ratings = await store.ratings(id);
       music.setNotificationRatings(id, ratings);
-      final selected = listId;
-      final order = await store.loadOrder(id, selected);
-      if (account?.id == id && listId == selected) manualOrder = order;
       notifyListeners();
     }
     return added;
@@ -382,7 +325,8 @@ class AppController extends ChangeNotifier {
   Future<T> _edit<T>(Future<T> Function(ZvukApi api, String accountId) action) {
     final session = api, id = account?.id;
     final result = _edits.catchError((_) {}).then((_) async {
-      if (session == null ||
+      if (_disposed ||
+          session == null ||
           id == null ||
           api != session ||
           account?.id != id) {
@@ -440,37 +384,6 @@ class AppController extends ChangeNotifier {
     }
     return lists.single;
   }
-
-  Future<void> setFavorite(Track track, bool liked) => _edit((
-    session,
-    id,
-  ) async {
-    final committed = favoriteTracks.where((t) => t.id != track.id).toList();
-    if (liked) committed.insert(0, track);
-    await session.setCollectionItem(track.id, liked: liked);
-    // Persist the successful write even when the follow-up read loses network.
-    // Votes, order, downloaded files and the playback queue are independent.
-    await _readBack(
-      session,
-      () => store.saveTracks(id, 'favorites', committed),
-    );
-    if (api == session && account?.id == id) {
-      favoriteTracks = committed;
-      if (listId == 'favorites') tracks = favoriteTracks;
-      _publishFavorites();
-      notifyListeners();
-    }
-    await _readBack(session, () async {
-      final favorites = await session.favorites();
-      await store.saveTracks(id, 'favorites', favorites);
-      if (api == session && account?.id == id) {
-        favoriteTracks = favorites;
-        if (listId == 'favorites') tracks = favorites;
-        _publishFavorites();
-        message = null;
-      }
-    });
-  });
 
   Future<void> savePlaylist(PlaylistInfo p, bool liked) =>
       _edit((session, id) async {

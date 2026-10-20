@@ -28,18 +28,18 @@ void main() {
     await store.vote('a', a, 1);
     await store.vote('a', a, 1);
     final minus = await store.vote('a', a, -1);
-    expect((await store.ratings('a'))['1']!.score, 11);
+    expect((await store.ratings('a'))['1']!.score, 10);
     await store.undo('other', minus);
-    expect((await store.ratings('a'))['1']!.score, 11);
+    expect((await store.ratings('a'))['1']!.score, 10);
     await store.undo('a', minus);
-    expect((await store.ratings('a'))['1']!.score, 12);
+    expect((await store.ratings('a'))['1']!.score, 11);
     await store.saveTracks('a', 'favorites', [b, a]);
     await store.close();
     store = await LibraryStore.open(
       factory: Platform.isAndroid ? native.databaseFactory : databaseFactoryFfi,
       databasePath: '${directory.path}/test.db',
     );
-    expect((await store.ratings('a'))['1']!.score, 12);
+    expect((await store.ratings('a'))['1']!.score, 11);
     expect(await store.ratings('other'), isEmpty);
     expect((await store.loadTracks('a', 'favorites')).map((t) => t.id), [
       '2',
@@ -74,7 +74,7 @@ void main() {
       expect(trackScore(a.id, await store.ratings('a')), 10);
       await store.importRatings('a', legacy);
       expect(trackScore(a.id, await store.ratings('a')), 10);
-      expect(trackScore('new-song', await store.ratings('a')), 10);
+      expect(trackScore('new-song', await store.ratings('a')), 9);
     },
   );
   test(
@@ -85,8 +85,8 @@ void main() {
       await store.undo('a', id);
       expect(await store.importRatings('a', backup), 0);
       expect(await store.importRatings('a', backup), 0);
-      expect(await store.ratings('a'), isEmpty);
-      expect(trackScore(a.id, await store.ratings('a')), 10);
+      expect((await store.ratings('a'))[a.id]!.count, 0);
+      expect(trackScore(a.id, await store.ratings('a')), 9);
       await expectLater(
         store.importRatings('b', backup),
         throwsFormatException,
@@ -107,7 +107,7 @@ void main() {
         store.importRatings('a', jsonEncode(data)),
         throwsFormatException,
       );
-      expect((await store.ratings('a'))['1']!.score, 11);
+      expect((await store.ratings('a'))['1']!.score, 10);
       data['events'] = [
         {...old, 'delta': 100},
       ];
@@ -117,14 +117,12 @@ void main() {
       );
     },
   );
-  test('Baseline after balanced votes differs from unrated and ties preserve order', () async {
+  test('Equal scores preserve source order after balanced votes', () async {
     await store.vote('a', a, 1);
     await store.vote('a', a, -1);
     final ratings = await store.ratings('a');
     expect(rankedTracks([b, a], ratings).map((t) => t.id), ['2', '1']);
-    expect(rankedTracks([b, a], ratings, unrated: true).map((t) => t.id), [
-      '2',
-    ]);
+    expect(ratings[a.id]!.count, 2);
     await store.vote('a', a, 1);
     expect(rankedTracks([b, a], await store.ratings('a')).first.id, '1');
   });
@@ -134,7 +132,7 @@ void main() {
     }
     await store.saveTracks('a', 'favorites', [a, b]);
     final last = await store.vote('a', a, -1);
-    expect((await store.ratings('a'))['1']!.score, -2);
+    expect((await store.ratings('a'))['1']!.score, -3);
     expect(
       rankedTracks(
         await store.loadTracks('a', 'favorites'),
@@ -144,27 +142,8 @@ void main() {
     );
     await store.undo('a', last);
     await store.undo('a', last);
-    expect((await store.ratings('a'))['1']!.score, -1);
+    expect((await store.ratings('a'))['1']!.score, -2);
   });
-
-  test(
-    'Manual order reconciles new and missing songs without losing duplicates',
-    () {
-      const c = Track(id: '3', title: 'Новый');
-      expect(
-        manuallyOrderedTracks(
-          [a, b, a, c],
-          ['2', 'missing', '1', '1', '1'],
-        ).map((t) => t.id),
-        ['2', '1', '1', '3'],
-      );
-      expect(manuallyOrderedTracks([a, c], ['2', '1']).map((t) => t.id), [
-        '1',
-        '3',
-      ]);
-      expect(manuallyOrderedTracks([b, a], []).map((t) => t.id), ['2', '1']);
-    },
-  );
 
   test(
     'Arrangements survive reopening and are scoped to account and list',
@@ -182,7 +161,7 @@ void main() {
       expect(await store.loadOrder('a', 'favorites'), ['2', '1']);
       expect(await store.loadOrder('a', 'playlist'), ['1', '2']);
       expect(await store.loadOrder('other', 'favorites'), isEmpty);
-      expect((await store.ratings('a'))['1']!.score, 11);
+      expect((await store.ratings('a'))['1']!.score, 10);
     },
   );
 
@@ -216,7 +195,7 @@ void main() {
       store.importRatings('a', jsonEncode(backup)),
       throwsFormatException,
     );
-    expect((await store.ratings('a'))['1']!.score, 11);
+    expect((await store.ratings('a'))['1']!.score, 10);
     expect(await store.loadOrder('a', 'favorites'), isEmpty);
   });
 }

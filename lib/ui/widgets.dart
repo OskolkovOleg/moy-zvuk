@@ -158,46 +158,9 @@ class RatingPositionLabel extends StatelessWidget {
   }
 }
 
-class OrderControls extends StatelessWidget {
-  const OrderControls({super.key, required this.title, this.onUp, this.onDown});
-  final String title;
-  final VoidCallback? onUp, onDown;
-  @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      IconButton(
-        tooltip: 'Выше: $title',
-        onPressed: onUp,
-        icon: const Icon(Icons.arrow_upward_rounded, size: 22),
-      ),
-      IconButton(
-        tooltip: 'Ниже: $title',
-        onPressed: onDown,
-        icon: const Icon(Icons.arrow_downward_rounded, size: 22),
-      ),
-    ],
-  );
-}
-
 void notify(BuildContext context, String message) {
   ScaffoldMessenger.of(context).hideCurrentSnackBar();
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-}
-
-Future<void> moveWithFeedback(
-  BuildContext context,
-  AppController app,
-  int index,
-  int delta,
-) async {
-  try {
-    await app.moveTrack(index, delta);
-  } catch (_) {
-    if (context.mounted) {
-      notify(context, 'Порядок не сохранился. Попробуй ещё раз.');
-    }
-  }
 }
 
 Future<void> voteWithFeedback(
@@ -227,74 +190,24 @@ class TrackMenu extends StatelessWidget {
   );
 }
 
-class FavoriteButton extends StatelessWidget {
-  const FavoriteButton(this.app, this.track, {super.key});
-  final AppController app;
-  final Track track;
-
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: app,
-    builder: (context, _) {
-      final liked = app.isFavorite(track.id);
-      return Semantics(
-        toggled: liked,
-        child: IconButton(
-          key: ValueKey('favorite:${track.id}'),
-          tooltip:
-              '${liked ? 'Убрать из любимого' : 'В любимое'}: ${track.title}',
-          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-          color: liked ? Theme.of(context).colorScheme.primary : null,
-          icon: Icon(
-            liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-            size: 22,
-          ),
-          onPressed: app.account == null || app.api == null || app.serverBusy
-              ? null
-              : () async {
-                  try {
-                    await app.setFavorite(track, !liked);
-                  } catch (_) {
-                    if (context.mounted) {
-                      notify(
-                        context,
-                        'Избранное не изменилось. Проверь подключение и повтори.',
-                      );
-                    }
-                  }
-                },
-        ),
-      );
-    },
-  );
-}
-
 class TrackTile extends StatelessWidget {
   const TrackTile({
     super.key,
     required this.track,
     required this.app,
     required this.onPlay,
-    this.orderIndex,
-    this.orderLength,
-    this.catalog = false,
     this.onActions,
-    this.showRatings,
   });
   final Track track;
   final AppController app;
   final VoidCallback onPlay;
-  final int? orderIndex, orderLength;
-  final bool catalog;
   final VoidCallback? onActions;
-  final bool? showRatings;
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: Listenable.merge([app, app.music.revision, app.music.downloads]),
     builder: (context, _) {
       final current = app.music.playlist.current?.id == track.id;
       final scheme = Theme.of(context).colorScheme;
-      final manual = orderIndex != null && !app.ranked;
       return Container(
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
@@ -389,26 +302,12 @@ class TrackTile extends StatelessWidget {
                 ),
               ),
             ),
-            FavoriteButton(app, track),
-            if ((showRatings ?? app.ranked) && !catalog)
-              RatingControls(
-                compact: true,
-                score: app.scoreFor(track),
-                title: track.title,
-                onVote: (delta) => voteWithFeedback(context, app, track, delta),
-              )
-            else ...[
-              if (manual)
-                OrderControls(
-                  title: track.title,
-                  onUp: orderIndex! > 0 && !app.reordering
-                      ? () => moveWithFeedback(context, app, orderIndex!, -1)
-                      : null,
-                  onDown: orderIndex! < orderLength! - 1 && !app.reordering
-                      ? () => moveWithFeedback(context, app, orderIndex!, 1)
-                      : null,
-                ),
-            ],
+            RatingControls(
+              compact: true,
+              score: app.scoreFor(track),
+              title: track.title,
+              onVote: (delta) => voteWithFeedback(context, app, track, delta),
+            ),
           ],
         ),
       );

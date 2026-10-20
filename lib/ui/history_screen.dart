@@ -166,7 +166,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     TrackTile(
                       app: widget.app,
                       track: entry.track,
-                      catalog: true,
                       onPlay: () => widget.app.music.playList(
                         entries.map((e) => e.track).toList(),
                         index,

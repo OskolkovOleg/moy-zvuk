@@ -18,13 +18,7 @@ class UnusedMusic implements MusicHandler {
   Future<void> Function(String account, Track track, int delta)?
   onNotificationVote;
   @override
-  Future<bool> Function(String account, Track track, bool liked)?
-  onNotificationFavorite;
-
-  @override
   void setNotificationRatings(String account, Map<String, Rating> ratings) {}
-  @override
-  void setNotificationFavorites(String account, List<Track> favorites) {}
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -226,133 +220,127 @@ void main() {
       old.close();
     },
   );
-  test(
-    'Favorite change preserves local votes and changes membership only',
-    () async {
-      for (var i = 0; i < 3; i++) {
-        await app.vote(track, -1);
-      }
-      app.api = ZvukApi(
-        'fixture',
-        client: MockClient((req) async {
-          if (jsonDecode(req.body)['operationName'] == 'setPlaylistToPublic') {
-            return response({
-              'playlist': {'setPublic': null},
-            });
-          }
-          if (jsonDecode(req.body)['operationName'] == 'changeCollection') {
-            return response({
-              'collection': {'addItem': null},
-            });
-          }
-          if (jsonDecode(req.body)['operationName'] == 'setPlaylistToPublic') {
-            return response({
-              'playlist': {'setPublic': null},
-            });
-          }
-          return http.Response('{}', 503);
-        }),
-      );
-      await app.setFavorite(track, true);
-      expect(app.isFavorite('t'), true);
-      expect(app.scoreFor(track), 7);
-      expect(app.tracks.single.id, 't');
-      expect((await store.loadTracks('owner', 'favorites')).single.id, 't');
-    },
-  );
 
-  test('Failed favorite mutation keeps membership and cache', () async {
-    app.favoriteTracks = [track];
-    app.tracks = [track];
-    await store.saveTracks('owner', 'favorites', [track]);
+  test('Plus collects a new song at ten and synchronizes once', () async {
+    var writes = 0;
     app.api = ZvukApi(
       'fixture',
-      client: MockClient((_) async => http.Response('{}', 503)),
+      client: MockClient((req) async {
+        expect(jsonDecode(req.body)['operationName'], 'changeCollection');
+        expect(jsonDecode(req.body)['query'], contains('addItem'));
+        writes++;
+        return response({
+          'collection': {'addItem': null},
+        });
+      }),
     );
-    await expectLater(
-      app.setFavorite(track, false),
-      throwsA(isA<ZvukException>()),
-    );
+    expect(app.scoreFor(track), 9);
+    await app.vote(track, 1);
+    await app.syncLibraryAdds();
+    expect(app.scoreFor(track), 10);
     expect(app.isFavorite(track.id), true);
-    expect((await store.loadTracks('owner', 'favorites')).single.id, track.id);
-    expect(app.serverBusy, false);
+    expect(app.visibleTracks.single.id, track.id);
+    await app.vote(track, 1);
+    await app.syncLibraryAdds();
+    expect(app.scoreFor(track), 11);
+    expect(writes, 1);
+    for (var i = 0; i < 12; i++) {
+      await app.vote(track, -1);
+    }
+    expect(app.scoreFor(track), -1);
+    expect(app.isFavorite(track.id), true);
+    expect(await store.pendingFavoriteAdds('owner'), isEmpty);
   });
 
   test(
-    'Successful favorite write after account switch only updates old cache',
+    'Failed sync preserves local score, membership and pending addition',
+    () async {
+      app.api = ZvukApi(
+        'fixture',
+        client: MockClient((_) async => http.Response('{}', 503)),
+      );
+      await app.vote(track, 1);
+      await app.syncLibraryAdds();
+      expect(app.scoreFor(track), 10);
+      expect(app.isFavorite(track.id), true);
+      expect(
+        (await store.loadTracks('owner', 'favorites')).single.id,
+        track.id,
+      );
+      expect(await store.pendingFavoriteAdds('owner'), hasLength(1));
+      expect(app.serverBusy, false);
+      app.api!.close();
+      app.api = ZvukApi(
+        'fixture',
+        client: MockClient(
+          (_) async => response({
+            'collection': {'addItem': null},
+          }),
+        ),
+      );
+      await app.syncLibraryAdds();
+      expect(await store.pendingFavoriteAdds('owner'), isEmpty);
+      expect(app.scoreFor(track), 10);
+    },
+  );
+
+  test(
+    'A completion after account switch only acknowledges the old account',
     () async {
       final entered = Completer<void>(), release = Completer<void>();
       final old = ZvukApi(
         'fixture',
-        client: MockClient((req) async {
-          if (jsonDecode(req.body)['operationName'] == 'changeCollection') {
-            entered.complete();
-            await release.future;
-            return response({
-              'collection': {'addItem': null},
-            });
-          }
-          return http.Response('{}', 503);
+        client: MockClient((_) async {
+          entered.complete();
+          await release.future;
+          return response({
+            'collection': {'addItem': null},
+          });
         }),
       );
       app.api = old;
-      final write = app.setFavorite(track, true);
+      await app.vote(track, 1);
       await entered.future;
+      final done = app.syncLibraryAdds();
       const other = Track(id: 'other', title: 'Other');
       app.account = const Account('other', 'Other');
       app.api = ZvukApi(
         'other',
-        client: MockClient((_) async => throw StateError('Must not call')),
+        client: MockClient(
+          (_) async => throw StateError('Must not write to new account'),
+        ),
       );
-      app.favoriteTracks = [other];
       app.tracks = [other];
+      app.favoriteTracks = [other];
+      app.ratings = {};
       release.complete();
-      await write;
+      await done;
       expect(app.favoriteTracks.single.id, other.id);
+      expect(await store.pendingFavoriteAdds('owner'), isEmpty);
       expect(
         (await store.loadTracks('owner', 'favorites')).single.id,
         track.id,
       );
       expect(await store.loadTracks('other', 'favorites'), isEmpty);
+      expect(app.ratings, isEmpty);
       old.close();
     },
   );
 
-  test('Stale library read cannot restore a removed favorite', () async {
+  test('A stale remote read cannot remove a locally collected song', () async {
     final entered = Completer<void>(), release = Completer<void>();
-    var reads = 0;
-    app.favoriteTracks = [track];
-    app.tracks = [track];
-    await store.saveTracks('owner', 'favorites', [track]);
     app.api = ZvukApi(
       'fixture',
       client: MockClient((req) async {
         switch (jsonDecode(req.body)['operationName']) {
           case 'userCollection':
-            if (++reads == 1) {
-              entered.complete();
-              await release.future;
-              return response({
-                'collection': {
-                  'tracks': [
-                    {'id': track.id},
-                  ],
-                },
-              });
-            }
+            entered.complete();
+            await release.future;
             return response({
               'collection': {'tracks': []},
             });
-          case 'getTracks':
-            return response({
-              'getTracks': [
-                {'id': track.id, 'title': track.title},
-              ],
-            });
           case 'changeCollection':
-            return response({
-              'collection': {'removeItem': null},
-            });
+            return http.Response('{}', 503);
           default:
             throw StateError('Unexpected request');
         }
@@ -360,11 +348,13 @@ void main() {
     );
     final read = app.selectPlaylist(null);
     await entered.future;
-    await app.setFavorite(track, false);
+    await app.vote(track, 1);
+    await app.syncLibraryAdds();
     release.complete();
     await read;
-    expect(app.isFavorite(track.id), false);
-    expect(app.tracks, isEmpty);
-    expect(await store.loadTracks('owner', 'favorites'), isEmpty);
+    expect(app.isFavorite(track.id), true);
+    expect(app.tracks.single.id, track.id);
+    expect((await store.loadTracks('owner', 'favorites')).single.id, track.id);
+    expect(app.scoreFor(track), 10);
   });
 }

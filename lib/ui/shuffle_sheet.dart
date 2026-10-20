@@ -4,23 +4,29 @@ import 'package:flutter/material.dart';
 
 import '../app_controller.dart';
 import '../data/models.dart';
+import '../playback/shuffle_tracks.dart';
 import 'widgets.dart';
 
 Future<void> openShuffle(BuildContext context, AppController app) async {
   if (app.tracks.isEmpty) return;
-  final count = await showModalBottomSheet<int>(
+  final account = app.account?.id, list = app.listId;
+  final tracks = List<Track>.of(app.tracks),
+      ratings = Map<String, Rating>.of(app.ratings);
+  final range = await showModalBottomSheet<ScoreRange>(
     context: context,
     showDragHandle: true,
     isScrollControlled: true,
-    builder: (_) => ShuffleSheet(
-      tracks: List.of(app.tracks),
-      ratings: Map.of(app.ratings),
-      title: app.listTitle,
-    ),
+    builder: (_) =>
+        ShuffleSheet(tracks: tracks, ratings: ratings, title: app.listTitle),
   );
-  if (count == null) return;
+  if (range == null || account != app.account?.id || list != app.listId) return;
   try {
-    await app.playShuffled(bestCount: count == 0 ? null : count);
+    await app.playShuffled(
+      minScore: range.min,
+      maxScore: range.max,
+      source: tracks,
+      scores: ratings,
+    );
   } catch (_) {
     if (context.mounted) notify(context, 'Не удалось запустить очередь.');
   }
@@ -41,17 +47,45 @@ class ShuffleSheet extends StatefulWidget {
 }
 
 class _ShuffleSheetState extends State<ShuffleSheet> {
-  bool best = false;
-  late int count = math.min(50, widget.tracks.length);
+  late final int lowest, highest;
+  late ScoreRange range;
+  @override
+  void initState() {
+    super.initState();
+    final scores = widget.tracks
+        .map((t) => trackScore(t.id, widget.ratings))
+        .toList();
+    lowest = scores.isEmpty ? initialTrackScore : scores.reduce(math.min);
+    highest = scores.isEmpty ? initialTrackScore : scores.reduce(math.max);
+    range = ScoreRange(lowest, highest);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final total = widget.tracks.length;
     final scheme = Theme.of(context).colorScheme;
-    final ranked = rankedTracks(widget.tracks, widget.ratings);
-    final cutoff = count > 0
-        ? trackScore(ranked[count - 1].id, widget.ratings)
-        : 0;
+    final matches = widget.tracks.where((t) {
+      final score = trackScore(t.id, widget.ratings);
+      return score >= range.min && score <= range.max;
+    }).length;
+    Widget bound(String title, int value, Key key) => Expanded(
+      child: Column(
+        crossAxisAlignment: title == 'От'
+            ? CrossAxisAlignment.start
+            : CrossAxisAlignment.end,
+        children: [
+          Text(title, style: TextStyle(color: scheme.onSurfaceVariant)),
+          Text(
+            '$value',
+            key: key,
+            style: TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w700,
+              color: scheme.primary,
+            ),
+          ),
+        ],
+      ),
+    );
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
@@ -68,73 +102,48 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
               widget.title,
               style: TextStyle(color: scheme.onSurfaceVariant),
             ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: SegmentedButton<bool>(
-                showSelectedIcon: false,
-                segments: const [
-                  ButtonSegment(value: false, label: Text('Все треки')),
-                  ButtonSegment(value: true, label: Text('Лучшие по баллам')),
-                ],
-                selected: {best},
-                onSelectionChanged: (s) => setState(() => best = s.first),
-              ),
-            ),
             const SizedBox(height: 24),
-            if (best) ...[
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Сколько лучших',
-                      style: Theme.of(context).textTheme.titleMedium,
+            Text(
+              'Диапазон баллов',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                bound('От', range.min, const Key('shuffle-min')),
+                bound('До', range.max, const Key('shuffle-max')),
+              ],
+            ),
+            RangeSlider(
+              key: const Key('shuffle-score-slider'),
+              min: lowest.toDouble(),
+              max: (highest == lowest ? highest + 1 : highest).toDouble(),
+              divisions: (highest - lowest).clamp(1, 200),
+              values: RangeValues(range.min.toDouble(), range.max.toDouble()),
+              labels: RangeLabels('${range.min}', '${range.max}'),
+              onChanged: highest == lowest
+                  ? null
+                  : (v) => setState(
+                      () => range = ScoreRange(v.start.round(), v.end.round()),
                     ),
-                  ),
-                  Text(
-                    '$count',
-                    key: const Key('shuffle-count'),
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w700,
-                      color: scheme.primary,
-                    ),
-                  ),
-                ],
-              ),
-              Slider(
-                key: const Key('shuffle-count-slider'),
-                min: 1,
-                max: math.max(2, total).toDouble(),
-                divisions: math.max(1, total - 1),
-                value: math.max(1, count).toDouble(),
-                label: 'Треков: $count',
-                onChanged: total > 1
-                    ? (v) => setState(() => count = v.round())
-                    : null,
-              ),
-              Text(
-                '$count из $total · от $cutoff баллов',
-                style: TextStyle(color: scheme.onSurfaceVariant),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Сначала выберем песни с наибольшими баллами, затем перемешаем их. У песен без оценок — 10 баллов.',
-              ),
-            ] else
-              Text(
-                'Треков в списке: $total. Все прозвучат в случайном порядке.',
-              ),
+            ),
+            Text(
+              matches == 0
+                  ? 'В этом диапазоне нет песен'
+                  : 'Подходит ${trackCountLabel(matches)}',
+              key: const Key('shuffle-matches'),
+              style: TextStyle(color: scheme.onSurfaceVariant),
+            ),
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
                 key: const Key('start-shuffle'),
-                onPressed: total == 0
+                onPressed: matches == 0
                     ? null
-                    : () => Navigator.pop(context, best ? count : 0),
+                    : () => Navigator.pop(context, range),
                 icon: const Icon(Icons.shuffle_rounded),
-                label: const Text('Перемешать и слушать'),
+                label: const Text('Слушать'),
               ),
             ),
           ],

@@ -169,12 +169,6 @@ void main() {
         await tap(find.text('Через 15 мин'));
         expect(music.sleepTimer.active, true);
         music.cancelSleepTimer();
-        await tap(find.byKey(const Key('settings-sort')));
-        await tap(find.text('По баллам').last);
-        expect(app.ranked, true);
-        expect(music.playlist.current!.id, 'two');
-        expect(music.playlist.tracks.map((t) => t.id), ['one', 'two']);
-
         await tap(find.byKey(const Key('settings-downloads')));
         expect(find.text('Скачанное'), findsWidgets);
         await tester.tap(find.byType(BackButton).last);
@@ -224,7 +218,6 @@ void main() {
           'settings-wave',
           'settings-download-quality',
           'settings-downloads',
-          'settings-sort',
           'settings-export',
           'settings-import',
           'settings-token',
