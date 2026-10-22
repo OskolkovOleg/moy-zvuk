@@ -97,6 +97,8 @@ flutter drive --driver test_driver/screenshots.dart --target integration_test/pl
 
 `JAVA_HOME` должен указывать на JDK 17+. При первой сборке скрипт создаёт личный ключ в `~/.local/share/zvuk-personal/signing/` и локальный `android/key.properties`. Сохраните ключ отдельно: он нужен для следующих обновлений. Эти файлы исключены из Git.
 
+Для сборки без нагрузки на локальный диск вручную запустите workflow **Android APK**. Он собирает ARM64 release, проверяет ресурсы уведомления и конструкторы ML Kit и сохраняет артефакт `zvuk-arm64-unsigned` на три дня. После загрузки APK выравнивается `zipalign -P 16`, подписывается локальным ключом через `apksigner` и проверяется повторно. Ключ и пароль остаются на компьютере; устанавливаемые APK в Releases уже подписаны.
+
 Для дополнительных кнопок уведомления на Android 7–12 используется локальная копия `audio_service` 0.18.19 с небольшой Android-правкой; описание и исходная лицензия сохранены в [third_party/audio_service/PATCHES.md](third_party/audio_service/PATCHES.md). На Android 13+ кнопки передаются через MediaSession.
 
 ### Живые интеграционные тесты
