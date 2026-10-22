@@ -1,0 +1,32 @@
+name: Android APK
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.6'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Build unsigned ARM64 release
+        run: flutter build apk --release --target-platform android-arm64
+      - name: Verify release resources and reflective constructors
+        run: python3 tool/verify_apk.py
+      - uses: actions/upload-artifact@v7
+        with:
+          name: zvuk-arm64-unsigned
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 3

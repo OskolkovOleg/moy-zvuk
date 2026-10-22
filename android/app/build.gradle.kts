@@ -46,7 +46,9 @@ android {
     }
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("personal")
+            if (signingFile.exists()) {
+                signingConfig = signingConfigs.getByName("personal")
+            }
             proguardFiles("proguard-rules.pro")
         }
     }

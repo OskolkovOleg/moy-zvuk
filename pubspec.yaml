@@ -1,7 +1,7 @@
 name: zvuk_personal
 description: "Личный плеер Звука с накопительным рейтингом"
 publish_to: 'none'
-version: 1.14.0+21
+version: 1.14.1+22
 environment:
   sdk: ^3.13.5
 dependencies:
