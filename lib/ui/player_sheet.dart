@@ -88,9 +88,9 @@ class MiniPlayer extends StatelessWidget {
                                   const SizedBox(height: 3),
                                   Tooltip(
                                     message:
-                                        '№ ${rank.position} из ${rank.total} по баллам в «${app.listTitle}»',
+                                        '№ ${rank.label} из ${rank.total} по баллам в «${app.listTitle}»',
                                     child: Text(
-                                      '№ ${rank.position} по баллам',
+                                      '№ ${rank.label} по баллам',
                                       key: const Key('mini-rating-position'),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,

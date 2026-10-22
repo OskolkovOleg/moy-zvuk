@@ -131,7 +131,7 @@ class RatingPositionLabel extends StatelessWidget {
     final label = Text(
       rank == null
           ? 'Нет в текущем списке'
-          : '№ ${rank.position} из ${rank.total} по баллам',
+          : '№ ${rank.label} из ${rank.total} по баллам',
       key: const Key('player-rating-position'),
       maxLines: compact ? 1 : null,
       overflow: compact ? TextOverflow.ellipsis : null,

@@ -6,6 +6,40 @@ import 'package:zvuk_personal/ui/shuffle_sheet.dart';
 import 'package:zvuk_personal/data/models.dart';
 
 void main() {
+  testWidgets(
+    'Rank label shows shared ranges and single places at large text',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      for (final (position, expected) in [
+        (const RatingPosition(1, 7, 100), '№ 1–7 из 100 по баллам'),
+        (const RatingPosition(78, 90, 100), '№ 78–90 из 100 по баллам'),
+        (const RatingPosition(8, 8, 100), '№ 8 из 100 по баллам'),
+        (null, 'Нет в текущем списке'),
+      ]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: appTheme(),
+            home: MediaQuery(
+              data: const MediaQueryData(textScaler: TextScaler.linear(1.6)),
+              child: Scaffold(
+                body: RatingPositionLabel(
+                  position: position,
+                  listTitle: 'Мои песни',
+                  compact: true,
+                ),
+              ),
+            ),
+          ),
+        );
+        expect(find.text(expected), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      }
+    },
+  );
+
   testWidgets('Equal-score range is disabled and usable with enlarged text', (
     tester,
   ) async {

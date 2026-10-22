@@ -17,7 +17,7 @@ import 'package:zvuk_personal/ui/widgets.dart';
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   testWidgets(
-    'Initial ten, compact rows, no removal and live rating position',
+    'Initial nine, compact rows, no removal and live shared rank ranges',
     (tester) async {
       final directory = await Directory.systemTemp.createTemp('zvuk-rating-ui');
       final store = await LibraryStore.open(
@@ -101,12 +101,17 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(find.text('№ 3 из 3 по баллам'), findsOneWidget);
-        for (var i = 0; i < 4; i++) {
+        for (var i = 0; i < 3; i++) {
           await tester.tap(
             find.byTooltip('Плюс один: ${b.title}').hitTestable(),
           );
           await tester.pumpAndSettle();
         }
+        expect(app.scoreFor(b), 11);
+        expect(find.text('№ 1–2 из 3 по баллам'), findsOneWidget);
+        expect(app.positionFor(a)!.label, '1–2');
+        await tester.tap(find.byTooltip('Плюс один: ${b.title}').hitTestable());
+        await tester.pumpAndSettle();
         expect(app.scoreFor(b), 12);
         expect(find.byType(SnackBar), findsNothing);
         expect(find.byType(SingleChildScrollView), findsNothing);
@@ -162,7 +167,7 @@ void main() {
         expect(find.text('В конец очереди'), findsOneWidget);
         expect(tester.takeException(), isNull);
         print(
-          'BASELINE 10, COMPACT rows, NEGATIVE retained, RANK updates, QUEUE independent, LONG_PRESS menu: passed',
+          'BASELINE 9, COMPACT rows, NEGATIVE retained, RANK ranges update, QUEUE independent, LONG_PRESS menu: passed',
         );
       } finally {
         tester.platformDispatcher.clearTextScaleFactorTestValue();

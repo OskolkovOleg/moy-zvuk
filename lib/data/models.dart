@@ -138,8 +138,10 @@ int trackScore(String id, Map<String, Rating> ratings) =>
     ratings[id]?.score ?? initialTrackScore;
 
 class RatingPosition {
-  const RatingPosition(this.position, this.total);
-  final int position, total;
+  const RatingPosition(this.start, this.end, this.total);
+  final int start, end, total;
+
+  String get label => start == end ? '$start' : '$start–$end';
 }
 
 RatingPosition? ratingPosition(
@@ -147,9 +149,15 @@ RatingPosition? ratingPosition(
   Map<String, Rating> ratings,
   String trackId,
 ) {
-  final sorted = rankedTracks(tracks, ratings);
-  final index = sorted.indexWhere((track) => track.id == trackId);
-  return index < 0 ? null : RatingPosition(index + 1, sorted.length);
+  if (!tracks.any((track) => track.id == trackId)) return null;
+  final score = trackScore(trackId, ratings);
+  var higher = 0, equal = 0;
+  for (final track in tracks) {
+    final other = trackScore(track.id, ratings);
+    if (other > score) higher++;
+    if (other == score) equal++;
+  }
+  return RatingPosition(higher + 1, higher + equal, tracks.length);
 }
 
 List<Track> rankedTracks(List<Track> tracks, Map<String, Rating> ratings) {
