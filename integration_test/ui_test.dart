@@ -149,7 +149,7 @@ void main() {
       };
       await tester.tap(find.text('Библиотека').last);
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('shuffle-list')));
+      await tester.tap(find.byKey(const Key('library-filter')));
       await tester.pumpAndSettle();
       final slider = tester.widget<RangeSlider>(
         find.byKey(const Key('shuffle-score-slider')),
@@ -158,7 +158,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Подходит 1 трек'), findsOneWidget);
       await binding.takeScreenshot('v120-08-shuffle-best');
-      await tester.tap(find.byKey(const Key('start-shuffle')));
+      await tester.tap(find.byKey(const Key('apply-library-filter')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('shuffle-list')));
       await tester.pump();
       await music.player.positionStream
           .firstWhere((p) => p.inMilliseconds > 400)

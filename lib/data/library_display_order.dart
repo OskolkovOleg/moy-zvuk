@@ -1,23 +1,43 @@
 import 'dart:collection';
 
 import 'models.dart';
+import 'library_filter.dart';
 
 /// Keeps rows in place while scores change during a library visit.
 class LibraryDisplayOrder {
   String? _account, _list;
   List<String>? _ids;
+  LibraryFilter? _filter;
+  final _eligible = <String, bool>{};
 
-  void reset() => _ids = null;
+  void reset() {
+    _ids = null;
+    _eligible.clear();
+  }
 
   List<Track> arrange(
     String? account,
     String list,
     List<Track> tracks,
-    Map<String, Rating> ratings,
-  ) {
-    if (_account != account || _list != list) reset();
+    Map<String, Rating> ratings, {
+    LibraryFilter filter = LibraryFilter.all,
+  }) {
+    if (_account != account || _list != list || _filter != filter) reset();
     _account = account;
     _list = list;
+    _filter = filter;
+    if (filter.isActive) {
+      final present = tracks.map((t) => t.id).toSet();
+      _eligible.removeWhere((id, _) => !present.contains(id));
+      tracks = [
+        for (final track in tracks)
+          if (_eligible.putIfAbsent(
+            track.id,
+            () => filter.matches(track, ratings),
+          ))
+            track,
+      ];
+    }
     final previous = _ids;
     final visible = <Track>[];
     final used = <int>{};

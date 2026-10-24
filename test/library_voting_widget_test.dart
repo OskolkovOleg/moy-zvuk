@@ -8,6 +8,8 @@ import 'package:zvuk_personal/data/library_store.dart';
 import 'package:zvuk_personal/data/models.dart';
 import 'package:zvuk_personal/data/audio_preferences.dart';
 import 'package:zvuk_personal/data/catalog_models.dart';
+import 'package:zvuk_personal/data/genre_filter.dart';
+import 'package:zvuk_personal/data/library_filter.dart';
 import 'package:zvuk_personal/downloads/download_manager.dart';
 import 'package:zvuk_personal/playback/music_handler.dart';
 import 'package:zvuk_personal/playback/playback_queue.dart';
@@ -18,6 +20,7 @@ import 'package:zvuk_personal/ui/widgets.dart';
 import 'package:zvuk_personal/ui/theme.dart';
 import 'package:zvuk_personal/ui/catalog_carousel.dart';
 import 'package:zvuk_personal/ui/catalog_detail_screen.dart';
+import 'package:zvuk_personal/ui/shuffle_sheet.dart';
 
 import 'ui_capture.dart';
 
@@ -50,6 +53,8 @@ class _Music implements MusicHandler {
   onNotificationVote;
   List<Track> played = [];
   int playedIndex = -1;
+  bool lastShuffled = false;
+  String lastTitle = '';
   @override
   Future<void> playList(
     List<Track> tracks,
@@ -59,6 +64,8 @@ class _Music implements MusicHandler {
   }) async {
     played = List.of(tracks);
     playedIndex = index;
+    lastShuffled = shuffled;
+    lastTitle = title;
   }
 
   @override
@@ -108,6 +115,154 @@ void main() {
       .widgetList<TrackTile>(find.byType(TrackTile))
       .map((tile) => tile.track.id)
       .toList();
+
+  testWidgets(
+    'Library applies rock and score filters; both play actions use that exact result',
+    (tester) async {
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      const rock = [TrackGenre(id: 'r', name: 'Rock')];
+      const pop = [TrackGenre(id: 'p', name: 'Pop')];
+      const low = Track(id: 'low', title: 'Рок — 9', genres: rock);
+      const middle = Track(id: 'middle', title: 'Рок — 10', genres: rock);
+      const high = Track(id: 'high', title: 'Рок — 13', genres: rock);
+      const other = Track(id: 'pop', title: 'Поп — 12', genres: pop);
+      for (final (width, scale, suffix) in [
+        (360.0, 1.0, 'normal'),
+        (320.0, 1.6, 'large'),
+      ]) {
+        tester.view.physicalSize = Size(width, 720);
+        tester.view.devicePixelRatio = 1;
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        app.tracks = [low, other, middle, high];
+        app.ratings = {
+          'middle': const Rating(10, 1),
+          'high': const Rating(13, 4),
+          'pop': const Rating(12, 3),
+        };
+        await tester.pumpWidget(
+          RepaintBoundary(key: captureKey, child: ZvukApp(app)),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('library-filter')));
+        await tester.pumpAndSettle();
+        tester
+            .widget<RangeSlider>(find.byKey(const Key('shuffle-score-slider')))
+            .onChanged!(const RangeValues(10, 13));
+        await tester.pumpAndSettle();
+        final rockChip = find.byKey(const ValueKey('shuffle-genre-rock'));
+        await tester.ensureVisible(rockChip);
+        await tester.tap(rockChip);
+        await tester.pumpAndSettle();
+        expect(find.text('Подходит 2 трека'), findsOneWidget);
+        expect(app.libraryFilter, LibraryFilter.all);
+        final apply = find.byKey(const Key('apply-library-filter'));
+        expect(apply.hitTestable(), findsOneWidget);
+        await captureUi(tester, 'library-filter-sheet-$suffix');
+        await tester.tap(apply);
+        await tester.pumpAndSettle();
+        expect(rows(tester), ['high', 'middle']);
+        expect(find.text('2 из 4 треков'), findsOneWidget);
+        expect(
+          app.libraryFilter,
+          LibraryFilter(minScore: 10, maxScore: 13, genres: {GenreGroup.rock}),
+        );
+        await captureUi(tester, 'library-filtered-$suffix');
+        await tester.tap(find.text(middle.title));
+        await tester.pumpAndSettle();
+        expect(music.played.map((t) => t.id), ['high', 'middle']);
+        expect(music.playedIndex, 1);
+        await tester.tap(find.byKey(const Key('play-from-top')));
+        await tester.pumpAndSettle();
+        expect(music.played.map((t) => t.id), ['high', 'middle']);
+        expect(music.playedIndex, 0);
+        await tester.tap(find.byKey(const Key('shuffle-list')));
+        await tester.pumpAndSettle();
+        expect(music.played.map((t) => t.id).toSet(), {'high', 'middle'});
+        expect(music.lastShuffled, true);
+        expect(music.lastTitle, 'Мои песни · Рок · 10–13 баллов');
+        final queue = music.played.map((t) => t.id).toList();
+        await app.vote(middle, -1);
+        await app.vote(low, 1);
+        await tester.pumpAndSettle();
+        expect(rows(tester), ['high', 'middle']);
+        expect(app.positionFor(middle)!.total, 4);
+        await tester.tap(find.byTooltip('Обновить библиотеку'));
+        await tester.pumpAndSettle();
+        expect(rows(tester), ['high', 'low']);
+        await tester.tap(find.byKey(const Key('clear-library-filter')));
+        await tester.pumpAndSettle();
+        expect(rows(tester), ['high', 'pop', 'low', 'middle']);
+        expect(app.libraryFilter, LibraryFilter.all);
+        expect(music.played.map((t) => t.id), queue);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      }
+    },
+  );
+
+  testWidgets(
+    'Empty filters can be cleared; cancelling a reset draft keeps the active filter',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = 1.6;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      app.tracks = [
+        const Track(
+          id: 'rock',
+          title: 'Рок',
+          genres: [TrackGenre(id: 'r', name: 'Rock')],
+        ),
+      ];
+      final filter = LibraryFilter(
+        minScore: 100,
+        maxScore: 200,
+        genres: {GenreGroup.rock},
+      );
+      app.setLibraryFilter(filter);
+      await tester.pumpWidget(
+        RepaintBoundary(key: captureKey, child: ZvukApp(app)),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Нет подходящих песен'), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(find.byKey(const Key('play-from-top')))
+            .onPressed,
+        isNull,
+      );
+      expect(
+        tester
+            .widget<IconButton>(find.byKey(const Key('shuffle-list')))
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.byKey(const Key('library-filter')));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<RangeSlider>(find.byKey(const Key('shuffle-score-slider')))
+            .values,
+        const RangeValues(100, 200),
+      );
+      await tester.tap(find.byKey(const Key('reset-filter-draft')));
+      await tester.pumpAndSettle();
+      expect(find.text('Подходит 1 трек'), findsOneWidget);
+      Navigator.of(tester.element(find.byType(ShuffleSheet))).pop();
+      await tester.pumpAndSettle();
+      expect(app.libraryFilter, filter);
+      await tester.tap(find.byKey(const Key('clear-library-filter')));
+      await tester.pumpAndSettle();
+      expect(app.visibleTracks.single.id, 'rock');
+      expect(music.played, isEmpty);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   testWidgets(
     'Back to top returns from the end without refreshing or sorting',

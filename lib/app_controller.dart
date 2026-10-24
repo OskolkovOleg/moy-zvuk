@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import 'data/library_store.dart';
 import 'data/library_display_order.dart';
+import 'data/library_filter.dart';
 import 'data/models.dart';
 import 'data/catalog_models.dart';
 import 'data/token_store.dart';
@@ -56,6 +57,25 @@ class AppController extends ChangeNotifier {
   String? message;
   int _selection = 0, _catalogRevision = 0, _ratingRevision = 0;
   final _displayOrder = LibraryDisplayOrder();
+  LibraryFilter _libraryFilter = LibraryFilter.all;
+  String? _filterAccount, _filterList;
+
+  LibraryFilter get libraryFilter {
+    if (_filterAccount != account?.id || _filterList != listId) {
+      _filterAccount = account?.id;
+      _filterList = listId;
+      _libraryFilter = LibraryFilter.all;
+    }
+    return _libraryFilter;
+  }
+
+  void setLibraryFilter(LibraryFilter filter) {
+    _filterAccount = account?.id;
+    _filterList = listId;
+    _libraryFilter = filter;
+    resortLibrary();
+  }
+
   int libraryRequests = 0;
   List<Track> favoriteTracks = [];
   List<CatalogItem> savedCatalogItems = [];
@@ -74,21 +94,36 @@ class AppController extends ChangeNotifier {
   RatingPosition? positionFor(Track track) =>
       ratingPosition(tracks, ratings, track.id);
 
-  List<Track> get visibleTracks =>
-      _displayOrder.arrange(account?.id, listId, tracks, ratings);
+  List<Track> get visibleTracks => _displayOrder.arrange(
+    account?.id,
+    listId,
+    tracks,
+    ratings,
+    filter: libraryFilter,
+  );
 
   void resortLibrary() {
     _displayOrder.reset();
     // Capture now: a vote may finish before the next UI frame is built.
-    _displayOrder.arrange(account?.id, listId, tracks, ratings);
+    _displayOrder.arrange(
+      account?.id,
+      listId,
+      tracks,
+      ratings,
+      filter: libraryFilter,
+    );
     notifyListeners();
   }
 
   Future<void> playVisible({int index = 0}) async {
     final snapshot = visibleTracks;
     if (snapshot.isEmpty) return;
-    await music.playList(snapshot, index, title: listTitle);
+    await music.playList(snapshot, index, title: libraryPlaybackTitle);
   }
+
+  String get libraryPlaybackTitle => libraryFilter.isActive
+      ? '$listTitle · ${libraryFilter.label}'
+      : listTitle;
 
   Future<void> playShuffled({
     int? minScore,

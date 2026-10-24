@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zvuk_personal/data/library_display_order.dart';
 import 'package:zvuk_personal/data/models.dart';
+import 'package:zvuk_personal/data/genre_filter.dart';
+import 'package:zvuk_personal/data/library_filter.dart';
 
 void main() {
   const a = Track(id: 'a', title: 'A');
@@ -62,5 +64,57 @@ void main() {
       'c',
       'a',
     ]);
+  });
+
+  test('Filtered membership stays fixed during votes, resets on refresh and respects new tracks', () {
+    const rockA = Track(
+      id: 'a',
+      title: 'A',
+      genres: [TrackGenre(id: 'r', name: 'Rock')],
+    );
+    const rockB = Track(
+      id: 'b',
+      title: 'B',
+      genres: [TrackGenre(id: 'r', name: 'Rock')],
+    );
+    const rockC = Track(
+      id: 'c',
+      title: 'C',
+      genres: [TrackGenre(id: 'r', name: 'Rock')],
+    );
+    const pop = Track(
+      id: 'p',
+      title: 'Pop',
+      genres: [TrackGenre(id: 'p', name: 'Pop')],
+    );
+    final scores = {
+      'a': const Rating(10, 1),
+      'b': const Rating(9, 0),
+      'c': const Rating(12, 3),
+      'p': const Rating(13, 4),
+    };
+    final filter = LibraryFilter(
+      minScore: 10,
+      maxScore: 13,
+      genres: {GenreGroup.rock},
+    );
+    final order = LibraryDisplayOrder();
+    List<String> visible(List<Track> source) => order
+        .arrange('owner', 'favorites', source, scores, filter: filter)
+        .map((t) => t.id)
+        .toList();
+    expect(visible([rockA, rockB, pop]), ['a']);
+    scores['a'] = const Rating(8, 3);
+    scores['b'] = const Rating(11, 2);
+    expect(visible([rockA, rockB, pop]), ['a']);
+    expect(visible([rockA, rockB, rockC, pop]), ['a', 'c']);
+    order.reset();
+    expect(visible([rockA, rockB, rockC, pop]), ['c', 'b']);
+    expect(
+      order
+          .arrange('owner', 'favorites', [rockA, rockB, rockC, pop], scores)
+          .map((t) => t.id),
+      ['p', 'c', 'b', 'a'],
+    );
   });
 }

@@ -6,7 +6,8 @@ import '../data/models.dart';
 import 'saved_catalog_screen.dart';
 import 'history_screen.dart';
 import 'widgets.dart';
-import 'shuffle_sheet.dart';
+import 'library_filter_control.dart';
+import '../data/library_filter.dart';
 import 'downloads_screen.dart';
 import 'download_widgets.dart';
 import 'library_shortcut.dart';
@@ -127,7 +128,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final scheme = Theme.of(context).colorScheme;
     final largeText = MediaQuery.textScalerOf(context).scale(13) > 17;
     final trackCount = Text(
-      trackCountLabel(tracks.length),
+      app.libraryFilter.isActive
+          ? '${tracks.length} из ${app.tracks.length} треков'
+          : trackCountLabel(tracks.length),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
@@ -261,6 +264,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
                             ),
                           ),
                           const SizedBox(height: 8),
+                          LibraryFilterControl(app),
+                          const SizedBox(height: 16),
                           if (largeText) ...[
                             trackCount,
                             const SizedBox(height: 8),
@@ -276,9 +281,23 @@ class _LibraryScreenState extends State<LibraryScreen> {
                               IconButton.outlined(
                                 key: const Key('shuffle-list'),
                                 tooltip: 'Перемешать',
-                                onPressed: app.tracks.isEmpty
+                                onPressed: tracks.isEmpty
                                     ? null
-                                    : () => openShuffle(context, app),
+                                    : () async {
+                                        try {
+                                          await app.playShuffled(
+                                            source: List.of(app.visibleTracks),
+                                            title: app.libraryPlaybackTitle,
+                                          );
+                                        } catch (_) {
+                                          if (context.mounted) {
+                                            notify(
+                                              context,
+                                              'Не удалось запустить очередь.',
+                                            );
+                                          }
+                                        }
+                                      },
                                 icon: const Icon(Icons.shuffle_rounded),
                               ),
                             ],
@@ -299,11 +318,41 @@ class _LibraryScreenState extends State<LibraryScreen> {
               if (tracks.isEmpty)
                 SliverFillRemaining(
                   hasScrollBody: false,
-                  child: EmptyState(
-                    icon: Icons.library_music_outlined,
-                    title: 'Здесь пока тихо',
-                    message: 'Потяни вниз, чтобы обновить библиотеку, или выбери другой плейлист.',
-                  ),
+                  child: app.libraryFilter.isActive
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Нет подходящих песен',
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(context).textTheme.titleLarge,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Измени жанры или диапазон баллов.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: scheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                OutlinedButton(
+                                  onPressed: () =>
+                                      app.setLibraryFilter(LibraryFilter.all),
+                                  child: const Text('Сбросить фильтры'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : EmptyState(
+                          icon: Icons.library_music_outlined,
+                          title: 'Здесь пока тихо',
+                          message: 'Потяни вниз, чтобы обновить библиотеку, или выбери другой плейлист.',
+                        ),
                 )
               else
                 SliverPadding(

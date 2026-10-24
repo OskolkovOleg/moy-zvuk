@@ -2,53 +2,29 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../app_controller.dart';
 import '../data/models.dart';
 import '../data/genre_filter.dart';
+import '../data/library_filter.dart';
 import '../playback/shuffle_tracks.dart';
-import 'widgets.dart';
 
 class ShuffleSelection {
-  ShuffleSelection(this.scores, Set<GenreGroup> genres)
-    : genres = Set.unmodifiable(genres);
+  ShuffleSelection(
+    this.scores,
+    Set<GenreGroup> genres, {
+    this.limitScores = true,
+  }) : genres = Set.unmodifiable(genres);
   final ScoreRange scores;
   final Set<GenreGroup> genres;
+  final bool limitScores;
+  LibraryFilter get filter => LibraryFilter(
+    minScore: limitScores ? scores.min : null,
+    maxScore: limitScores ? scores.max : null,
+    genres: genres,
+  );
 
   String titleFor(String title) => genres.isEmpty
       ? title
       : '$title · ${genres.map((g) => g.label).join(', ')}';
-}
-
-Future<void> openShuffle(BuildContext context, AppController app) async {
-  if (app.tracks.isEmpty) return;
-  final account = app.account?.id, list = app.listId;
-  final tracks = List<Track>.of(app.tracks),
-      ratings = Map<String, Rating>.of(app.ratings);
-  final selection = await showModalBottomSheet<ShuffleSelection>(
-    context: context,
-    showDragHandle: true,
-    isScrollControlled: true,
-    builder: (_) =>
-        ShuffleSheet(tracks: tracks, ratings: ratings, title: app.listTitle),
-  );
-  if (selection == null || account != app.account?.id || list != app.listId) {
-    return;
-  }
-  try {
-    await app.playShuffled(
-      minScore: selection.scores.min,
-      maxScore: selection.scores.max,
-      source: filterTracksByGenreAndScore(
-        tracks,
-        ratings,
-        groups: selection.genres,
-      ),
-      scores: ratings,
-      title: selection.titleFor(app.listTitle),
-    );
-  } catch (_) {
-    if (context.mounted) notify(context, 'Не удалось запустить очередь.');
-  }
 }
 
 class ShuffleSheet extends StatefulWidget {
@@ -57,16 +33,22 @@ class ShuffleSheet extends StatefulWidget {
     required this.tracks,
     required this.ratings,
     required this.title,
+    this.libraryMode = false,
+    this.initialFilter = LibraryFilter.all,
   });
   final List<Track> tracks;
   final Map<String, Rating> ratings;
   final String title;
+  final bool libraryMode;
+  final LibraryFilter initialFilter;
   @override
   State<ShuffleSheet> createState() => _ShuffleSheetState();
 }
 
 class _ShuffleSheetState extends State<ShuffleSheet> {
   late final int lowest, highest;
+  late final int actualLowest, actualHighest;
+  late bool limitScores;
   late ScoreRange range;
   final selectedGenres = <GenreGroup>{};
   late final Set<GenreGroup> availableGenres;
@@ -76,11 +58,40 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
     final scores = widget.tracks
         .map((t) => trackScore(t.id, widget.ratings))
         .toList();
-    lowest = scores.isEmpty ? initialTrackScore : scores.reduce(math.min);
-    highest = scores.isEmpty ? initialTrackScore : scores.reduce(math.max);
-    range = ScoreRange(lowest, highest);
-    availableGenres = widget.tracks.expand(genreGroupsFor).toSet();
+    actualLowest = scores.isEmpty ? initialTrackScore : scores.reduce(math.min);
+    actualHighest = scores.isEmpty
+        ? initialTrackScore
+        : scores.reduce(math.max);
+    final initial = widget.initialFilter;
+    lowest = [
+      actualLowest,
+      initial.minScore ?? actualLowest,
+      initial.maxScore ?? actualLowest,
+    ].reduce(math.min);
+    highest = [
+      actualHighest,
+      initial.minScore ?? actualHighest,
+      initial.maxScore ?? actualHighest,
+    ].reduce(math.max);
+    range = ScoreRange(initial.minScore ?? lowest, initial.maxScore ?? highest);
+    limitScores = !widget.libraryMode || initial.hasScores;
+    selectedGenres.addAll(initial.genres);
+    availableGenres = {
+      ...widget.tracks.expand(genreGroupsFor),
+      ...initial.genres,
+    };
   }
+
+  void reset() => setState(() {
+    selectedGenres.clear();
+    range = ScoreRange(actualLowest, actualHighest);
+    limitScores = !widget.libraryMode;
+  });
+
+  void submit(BuildContext context) => Navigator.pop(
+    context,
+    ShuffleSelection(range, selectedGenres, limitScores: limitScores),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -89,8 +100,8 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
       widget.tracks,
       widget.ratings,
       groups: selectedGenres,
-      minScore: range.min,
-      maxScore: range.max,
+      minScore: limitScores ? range.min : null,
+      maxScore: limitScores ? range.max : null,
     ).length;
     Widget bound(String title, int value, Key key) => Expanded(
       child: Column(
@@ -128,19 +139,45 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Перемешать',
+                      widget.libraryMode ? 'Фильтры' : 'Перемешать',
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      widget.title,
-                      style: TextStyle(color: scheme.onSurfaceVariant),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            widget.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: scheme.onSurfaceVariant),
+                          ),
+                        ),
+                        if (widget.libraryMode)
+                          TextButton(
+                            key: const Key('reset-filter-draft'),
+                            onPressed: reset,
+                            child: const Text('Сбросить'),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 24),
                     Text(
                       'Диапазон баллов',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
+                    if (widget.libraryMode) ...[
+                      const SizedBox(height: 8),
+                      FilterChip(
+                        key: const Key('filter-any-score'),
+                        label: const Text('Любые баллы'),
+                        selected: !limitScores,
+                        onSelected: (_) => setState(() {
+                          limitScores = false;
+                          range = ScoreRange(actualLowest, actualHighest);
+                        }),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -161,12 +198,13 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
                       labels: RangeLabels('${range.min}', '${range.max}'),
                       onChanged: highest == lowest
                           ? null
-                          : (v) => setState(
-                              () => range = ScoreRange(
+                          : (v) => setState(() {
+                              limitScores = true;
+                              range = ScoreRange(
                                 v.start.round(),
                                 v.end.round(),
-                              ),
-                            ),
+                              );
+                            }),
                     ),
                     if (availableGenres.isNotEmpty) ...[
                       const SizedBox(height: 12),
@@ -223,17 +261,19 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
                     style: TextStyle(color: scheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 12),
-                  FilledButton.icon(
-                    key: const Key('start-shuffle'),
-                    onPressed: matches == 0
-                        ? null
-                        : () => Navigator.pop(
-                            context,
-                            ShuffleSelection(range, selectedGenres),
-                          ),
-                    icon: const Icon(Icons.shuffle_rounded),
-                    label: const Text('Слушать'),
-                  ),
+                  if (widget.libraryMode)
+                    FilledButton(
+                      key: const Key('apply-library-filter'),
+                      onPressed: () => submit(context),
+                      child: const Text('Показать'),
+                    )
+                  else
+                    FilledButton.icon(
+                      key: const Key('start-shuffle'),
+                      onPressed: matches == 0 ? null : () => submit(context),
+                      icon: const Icon(Icons.shuffle_rounded),
+                      label: const Text('Слушать'),
+                    ),
                 ],
               ),
             ),

@@ -182,7 +182,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
         await binding.takeScreenshot('v140-score-library-large');
-        await tester.tap(find.byKey(const Key('shuffle-list')));
+        await tester.tap(find.byKey(const Key('library-filter')));
         await tester.pumpAndSettle();
         final slider = tester.widget<RangeSlider>(
           find.byKey(const Key('shuffle-score-slider')),
@@ -208,7 +208,9 @@ void main() {
           '9',
         );
         await binding.takeScreenshot('v140-score-range-large');
-        await tester.tap(find.byKey(const Key('start-shuffle')));
+        await tester.tap(find.byKey(const Key('apply-library-filter')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('shuffle-list')));
         await tester.pump();
         await clips.until(() => music.player.playing && !music.loading);
         expect(music.playlist.tracks.single.id, a.id);

@@ -11,6 +11,7 @@ import 'package:zvuk_personal/app_controller.dart';
 import 'package:zvuk_personal/data/library_store.dart';
 import 'package:zvuk_personal/data/models.dart';
 import 'package:zvuk_personal/data/zvuk_api.dart';
+import 'package:zvuk_personal/data/library_filter.dart';
 import 'package:zvuk_personal/playback/music_handler.dart';
 
 class UnusedMusic implements MusicHandler {
@@ -62,6 +63,20 @@ void main() {
   });
   http.Response response(Object value) =>
       http.Response(jsonEncode({'data': value}), 200);
+
+  test('Library filters reset on account or source changes without altering the queue', () {
+    app.tracks = [track];
+    app.setLibraryFilter(LibraryFilter(minScore: 10, maxScore: 13));
+    expect(app.visibleTracks, isEmpty);
+    app.listId = 'playlist';
+    expect(app.libraryFilter, LibraryFilter.all);
+    expect(app.visibleTracks.single.id, track.id);
+    app.setLibraryFilter(LibraryFilter(minScore: 100));
+    app.account = const Account('other', 'Other');
+    expect(app.libraryFilter, LibraryFilter.all);
+    expect(app.visibleTracks.single.id, track.id);
+    expect(music.played, isEmpty);
+  });
 
   test(
     'Repeated votes preserve rows and playback until offline refresh',
