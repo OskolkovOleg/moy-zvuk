@@ -90,13 +90,13 @@ ThemeData appTheme() {
       selectedColor: scheme.primary,
       side: BorderSide.none,
       shape: const StadiumBorder(),
-      labelStyle: WidgetStateTextStyle.resolveWith(
-        (states) => TextStyle(
-          fontFamily: 'Roboto',
-          color: states.contains(WidgetState.selected)
+      labelStyle: TextStyle(
+        fontFamily: 'Roboto',
+        fontSize: 13,
+        color: WidgetStateColor.resolveWith(
+          (states) => states.contains(WidgetState.selected)
               ? scheme.onPrimary
               : scheme.onSurface,
-          fontSize: 13,
         ),
       ),
       checkmarkColor: scheme.onPrimary,

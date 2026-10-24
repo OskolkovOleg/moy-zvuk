@@ -15,7 +15,12 @@ class LibraryShortcut extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(right: 10),
     child: SizedBox(
-      width: 124,
+      width:
+          124 *
+          (MediaQuery.textScalerOf(context).scale(13) / 13).clamp(
+            1.0,
+            double.infinity,
+          ),
       child: Material(
         color: Theme.of(context).colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(20),

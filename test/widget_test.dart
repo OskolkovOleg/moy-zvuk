@@ -77,6 +77,11 @@ void main() {
       await tester.tap(rock);
       await tester.pumpAndSettle();
       expect(find.text('Подходит 2 трека'), findsOneWidget);
+      final selectedStyle = DefaultTextStyle.of(
+        tester.element(find.text('Рок')),
+      ).style;
+      expect(selectedStyle.color, appTheme().colorScheme.onPrimary);
+      expect(selectedStyle.fontFamily, 'Roboto');
       tester
           .widget<RangeSlider>(find.byKey(const Key('shuffle-score-slider')))
           .onChanged!(const RangeValues(10, 14));
