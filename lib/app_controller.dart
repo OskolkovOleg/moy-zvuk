@@ -79,6 +79,8 @@ class AppController extends ChangeNotifier {
 
   void resortLibrary() {
     _displayOrder.reset();
+    // Capture now: a vote may finish before the next UI frame is built.
+    _displayOrder.arrange(account?.id, listId, tracks, ratings);
     notifyListeners();
   }
 
