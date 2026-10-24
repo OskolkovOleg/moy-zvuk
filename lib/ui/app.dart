@@ -22,6 +22,9 @@ class ZvukApp extends StatefulWidget {
 class _ZvukAppState extends State<ZvukApp> with WidgetsBindingObserver {
   int tab = 0, libraryRequests = 0;
   final visited = <int>{0};
+  late final _libraryNavigation = _LibraryReturnObserver(() {
+    if (mounted && tab == 0) widget.app.resortLibrary();
+  });
   @override
   void initState() {
     super.initState();
@@ -36,6 +39,9 @@ class _ZvukAppState extends State<ZvukApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      widget.app.resortLibrary();
+    }
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
       unawaited(widget.app.music.savePosition());
@@ -57,6 +63,7 @@ class _ZvukAppState extends State<ZvukApp> with WidgetsBindingObserver {
     title: 'Мой Звук',
     debugShowCheckedModeBanner: false,
     theme: appTheme(),
+    navigatorObservers: [_libraryNavigation],
     home: AnimatedBuilder(
       animation: widget.app,
       builder: (context, _) {
@@ -140,10 +147,13 @@ class _ZvukAppState extends State<ZvukApp> with WidgetsBindingObserver {
             maxScaleFactor: 1.1,
             child: NavigationBar(
               selectedIndex: tab,
-              onDestinationSelected: (value) => setState(() {
-                tab = value;
-                visited.add(value);
-              }),
+              onDestinationSelected: (value) {
+                if (value == 0) app.resortLibrary();
+                setState(() {
+                  tab = value;
+                  visited.add(value);
+                });
+              },
               destinations: const [
                 NavigationDestination(
                   icon: Icon(Icons.library_music_outlined),
@@ -170,4 +180,19 @@ class _ZvukAppState extends State<ZvukApp> with WidgetsBindingObserver {
       },
     ),
   );
+}
+
+class _LibraryReturnObserver extends NavigatorObserver {
+  _LibraryReturnObserver(this.onReturn);
+  final VoidCallback onReturn;
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPop(route, previousRoute);
+    if (route is PageRoute && previousRoute?.isFirst == true) {
+      scheduleMicrotask(() {
+        if (previousRoute?.isCurrent == true) onReturn();
+      });
+    }
+  }
 }

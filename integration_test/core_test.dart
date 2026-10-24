@@ -8,6 +8,7 @@ import '../test/playback_queue_test.dart' as queue;
 import '../test/zvuk_api_test.dart' as api;
 import '../test/shuffle_test.dart' as shuffle;
 import '../test/rating_position_test.dart' as positions;
+import '../test/library_display_order_test.dart' as display_order;
 
 import '../test/catalog_api_test.dart' as catalog;
 import '../test/collection_controller_test.dart' as collection;
@@ -43,4 +44,5 @@ void main() {
   group('API', api.main);
   group('Shuffle', shuffle.main);
   group('Rating positions', positions.main);
+  group('Stable library rows', display_order.main);
 }

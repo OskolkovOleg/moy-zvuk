@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'data/library_store.dart';
+import 'data/library_display_order.dart';
 import 'data/models.dart';
 import 'data/catalog_models.dart';
 import 'data/token_store.dart';
@@ -53,7 +54,8 @@ class AppController extends ChangeNotifier {
   String listId = 'favorites', listTitle = 'Мои песни';
   bool busy = false, connecting = false;
   String? message;
-  int _selection = 0, _catalogRevision = 0;
+  int _selection = 0, _catalogRevision = 0, _ratingRevision = 0;
+  final _displayOrder = LibraryDisplayOrder();
   int libraryRequests = 0;
   List<Track> favoriteTracks = [];
   List<CatalogItem> savedCatalogItems = [];
@@ -72,7 +74,13 @@ class AppController extends ChangeNotifier {
   RatingPosition? positionFor(Track track) =>
       ratingPosition(tracks, ratings, track.id);
 
-  List<Track> get visibleTracks => rankedTracks(tracks, ratings);
+  List<Track> get visibleTracks =>
+      _displayOrder.arrange(account?.id, listId, tracks, ratings);
+
+  void resortLibrary() {
+    _displayOrder.reset();
+    notifyListeners();
+  }
 
   Future<void> playVisible({int index = 0}) async {
     final snapshot = visibleTracks;
@@ -193,6 +201,9 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> refresh() async {
+    if (_disposed) return;
+    final ratingRevision = _ratingRevision;
+    resortLibrary();
     if (busy || serverBusy || api == null || account == null) return;
     await syncLibraryAdds();
     if (_disposed || busy || serverBusy || api == null || account == null) {
@@ -221,7 +232,10 @@ class AppController extends ChangeNotifier {
         if (revision != _catalogRevision) return;
         favoriteTracks = favorites;
         playlists = lists;
-        if (selection == _selection) tracks = active;
+        if (selection == _selection) {
+          tracks = active;
+          if (ratingRevision == _ratingRevision) _displayOrder.reset();
+        }
       }
     } catch (e) {
       if (account?.id == id) {
@@ -244,6 +258,7 @@ class AppController extends ChangeNotifier {
     final cached = await store.loadTracks(id, selected);
     if (selection != _selection || account?.id != id) return;
     tracks = selected == 'favorites' ? favoriteTracks : cached;
+    _displayOrder.reset();
     notifyListeners();
     if (api == null) return;
     final session = api!, revision = _catalogRevision;
@@ -262,6 +277,7 @@ class AppController extends ChangeNotifier {
           account?.id == id &&
           revision == _catalogRevision) {
         tracks = result;
+        _displayOrder.reset();
         if (selected == 'favorites') {
           favoriteTracks = result;
         }
@@ -288,6 +304,7 @@ class AppController extends ChangeNotifier {
   Future<String> vote(Track track, int delta) async {
     final id = account!.id;
     ++_catalogRevision;
+    ++_ratingRevision;
     final event = await store.vote(id, track, delta, addToLibrary: delta > 0);
     final updated = await store.ratings(id);
     final favorites = await store.loadTracks(id, 'favorites');
@@ -303,6 +320,7 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> undo(String accountId, String event) async {
+    if (account?.id == accountId) ++_ratingRevision;
     await store.undo(accountId, event);
     if (account?.id == accountId) {
       ratings = await store.ratings(accountId);
@@ -313,6 +331,7 @@ class AppController extends ChangeNotifier {
 
   Future<int> importRatings(String source) async {
     final id = account!.id;
+    ++_ratingRevision;
     final added = await store.importRatings(id, source);
     if (account?.id == id) {
       ratings = await store.ratings(id);

@@ -14,6 +14,19 @@ import 'package:zvuk_personal/data/zvuk_api.dart';
 import 'package:zvuk_personal/playback/music_handler.dart';
 
 class UnusedMusic implements MusicHandler {
+  List<Track> played = [];
+  int playedIndex = -1;
+  @override
+  Future<void> playList(
+    List<Track> tracks,
+    int index, {
+    String title = 'Очередь',
+    bool shuffled = false,
+  }) async {
+    played = List.of(tracks);
+    playedIndex = index;
+  }
+
   @override
   Future<void> Function(String account, Track track, int delta)?
   onNotificationVote;
@@ -29,6 +42,7 @@ void main() {
   late LibraryStore store;
   late Directory directory;
   late AppController app;
+  late UnusedMusic music;
   const track = Track(id: 't', title: 'Track');
   setUp(() async {
     directory = await Directory.systemTemp.createTemp('zvuk-collection-test');
@@ -36,7 +50,8 @@ void main() {
       factory: Platform.isAndroid ? native.databaseFactory : databaseFactoryFfi,
       databasePath: '${directory.path}/test.db',
     );
-    app = AppController(store, UnusedMusic())
+    music = UnusedMusic();
+    app = AppController(store, music)
       ..account = const Account('owner', 'Owner');
   });
   tearDown(() async {
@@ -47,6 +62,110 @@ void main() {
   });
   http.Response response(Object value) =>
       http.Response(jsonEncode({'data': value}), 200);
+
+  test(
+    'Repeated votes preserve rows and playback until offline refresh',
+    () async {
+      const a = Track(id: 'a', title: 'A');
+      const b = Track(id: 'b', title: 'B');
+      app.tracks = app.favoriteTracks = [a, b];
+      await store.saveTracks('owner', 'favorites', app.tracks);
+      expect(app.visibleTracks.map((t) => t.id), ['a', 'b']);
+      for (var i = 0; i < 5; i++) {
+        await app.vote(b, 1);
+        expect(app.visibleTracks.map((t) => t.id), ['a', 'b']);
+      }
+      expect(app.scoreFor(b), 14);
+      expect(app.positionFor(b)!.label, '1');
+      expect((await store.ratings('owner'))['b']!.score, 14);
+      await app.playVisible(index: 1);
+      expect(music.played.map((t) => t.id), ['a', 'b']);
+      expect(music.played[music.playedIndex].id, 'b');
+      await app.playVisible();
+      expect(music.playedIndex, 0);
+      expect(music.played.first.id, 'a');
+      await app.refresh(); // Re-sorting works even without an API connection.
+      expect(app.visibleTracks.map((t) => t.id), ['b', 'a']);
+      for (var i = 0; i < 8; i++) {
+        await app.vote(b, -1);
+        expect(app.visibleTracks.map((t) => t.id), ['b', 'a']);
+      }
+      expect(app.scoreFor(b), 6);
+      expect(app.positionFor(b)!.label, '2');
+      await app.selectPlaylist(null);
+      expect(app.visibleTracks.map((t) => t.id), ['a', 'b']);
+      expect(await store.loadTracks('owner', 'favorites'), hasLength(2));
+    },
+  );
+
+  test(
+    'Slow refresh does not move a song voted on during synchronization',
+    () async {
+      const a = Track(id: 'a', title: 'A');
+      const b = Track(id: 'b', title: 'B');
+      await store.saveTracks('owner', 'favorites', [a]);
+      await store.vote('owner', b, 1, addToLibrary: true);
+      app.tracks = app.favoriteTracks = await store.loadTracks(
+        'owner',
+        'favorites',
+      );
+      app.ratings = await store.ratings('owner');
+      expect(app.visibleTracks.map((t) => t.id), ['b', 'a']);
+      final entered = Completer<void>(), release = Completer<void>();
+      app.api = ZvukApi(
+        'fixture',
+        client: MockClient((req) async {
+          switch (jsonDecode(req.body)['operationName']) {
+            case 'changeCollection':
+              entered.complete();
+              await release.future;
+              return response({
+                'collection': {'addItem': null},
+              });
+            case 'savedCatalog':
+              return response({
+                'collection': {'artists': [], 'releases': []},
+              });
+            case 'userCollection':
+              return response({
+                'collection': {
+                  'tracks': [
+                    {'id': 'a'},
+                    {'id': 'b'},
+                  ],
+                },
+              });
+            case 'getTracks':
+              return response({
+                'getTracks': [
+                  {'id': 'a', 'title': 'A'},
+                  {'id': 'b', 'title': 'B'},
+                ],
+              });
+            case 'userPlaylists':
+              return response({
+                'collection': {'playlists': []},
+              });
+            default:
+              throw StateError('Unexpected request');
+          }
+        }),
+      );
+      final refresh = app.refresh();
+      await entered.future;
+      await app.vote(b, -1);
+      await app.vote(b, -1);
+      expect(app.scoreFor(b), 8);
+      expect(app.visibleTracks.map((t) => t.id), ['b', 'a']);
+      release.complete();
+      await refresh;
+      expect(app.message, isNull);
+      expect(app.visibleTracks.map((t) => t.id), ['b', 'a']);
+      await app.refresh();
+      expect(app.visibleTracks.map((t) => t.id), ['a', 'b']);
+    },
+  );
+
   test('Refuses another owner and stale snapshots before mutation', () async {
     var writes = 0;
     app.api = ZvukApi(
