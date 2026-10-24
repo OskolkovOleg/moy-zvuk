@@ -95,6 +95,7 @@ class ArtistLink extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 3),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Flexible(
                   child: Text(

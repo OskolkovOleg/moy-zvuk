@@ -17,6 +17,7 @@ import 'package:zvuk_personal/ui/library_screen.dart';
 import 'package:zvuk_personal/ui/widgets.dart';
 import 'package:zvuk_personal/ui/theme.dart';
 import 'package:zvuk_personal/ui/catalog_carousel.dart';
+import 'package:zvuk_personal/ui/catalog_detail_screen.dart';
 
 import 'ui_capture.dart';
 
@@ -263,6 +264,87 @@ void main() {
       await tester.tap(find.text(items.first.title));
       expect(opened?.id, 'p');
       await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'Only the artist name opens the artist; the rest plays the song',
+    (tester) async {
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      const track = Track(
+        id: 'tap-target',
+        title: 'Песня с длинным названием',
+        artists: 'Я',
+        artistIds: ['artist'],
+        artistNames: ['Я'],
+      );
+      app.tracks = [track];
+      for (final (width, scale) in [(360.0, 1.0), (320.0, 1.6)]) {
+        tester.view.physicalSize = Size(width, 720);
+        tester.view.devicePixelRatio = 1;
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        var plays = 0, actions = 0;
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: appTheme(),
+            home: Scaffold(
+              body: Center(
+                child: TrackTile(
+                  track: track,
+                  app: app,
+                  onPlay: () => plays++,
+                  onActions: () => actions++,
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final art = tester.getRect(find.byType(Artwork));
+        final ratings = tester.getRect(find.byType(RatingControls));
+        final artist = find.text(track.artists);
+        final points = [
+          art.center,
+          tester.getCenter(find.text(track.title)),
+          Offset(art.right + 5, art.center.dy),
+          // Same line as the artist, but in the empty space after its name.
+          Offset(ratings.left - 4, tester.getCenter(artist).dy),
+        ];
+        for (var i = 0; i < points.length; i++) {
+          await tester.tapAt(points[i]);
+          await tester.pumpAndSettle();
+          expect(plays, i + 1);
+          expect(find.byType(CatalogDetailScreen), findsNothing);
+        }
+        await tester.tap(find.byTooltip('Плюс один: ${track.title}'));
+        await tester.pumpAndSettle();
+        expect(app.scoreFor(track), 10);
+        await tester.tap(find.byTooltip('Минус один: ${track.title}'));
+        await tester.pumpAndSettle();
+        expect(app.scoreFor(track), 9);
+        expect(plays, points.length);
+        await tester.longPress(find.text(track.title));
+        await tester.pumpAndSettle();
+        expect(actions, 1);
+        expect(plays, points.length);
+        await tester.tap(artist);
+        await tester.pumpAndSettle();
+        expect(find.byType(CatalogDetailScreen), findsOneWidget);
+        expect(
+          tester
+              .widget<CatalogDetailScreen>(find.byType(CatalogDetailScreen))
+              .item
+              .id,
+          'artist',
+        );
+        expect(plays, points.length);
+        expect(tester.takeException(), isNull);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        await tester.pumpWidget(const SizedBox.shrink());
+      }
     },
   );
 
