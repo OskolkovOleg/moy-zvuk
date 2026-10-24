@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,11 +24,25 @@ Future<void> loadUiFonts() async {
     }
   }
   await loader.load();
+  final icons = FontLoader('MaterialIcons')
+    ..addFont(
+      File('$sdk/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf')
+          .readAsBytes()
+          .then((bytes) => ByteData.sublistView(bytes)),
+    );
+  await icons.load();
 }
 
 Future<void> captureUi(WidgetTester tester, String name) async {
   final directory = Platform.environment['ZVUK_UI_CAPTURE_DIR'];
   if (directory == null) return;
+  await tester.runAsync(
+    () => precacheImage(
+      const AssetImage('assets/brand/icon.png'),
+      tester.element(find.byType(MaterialApp).first),
+    ),
+  );
+  await tester.pumpAndSettle();
   final boundary = tester.renderObject<RenderRepaintBoundary>(
     find.byKey(captureKey),
   );

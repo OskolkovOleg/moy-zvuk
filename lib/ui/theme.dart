@@ -23,6 +23,7 @@ ThemeData appTheme() {
       );
   return ThemeData(
     useMaterial3: true,
+    fontFamily: 'Roboto',
     colorScheme: scheme,
     scaffoldBackgroundColor: scheme.surface,
     dividerColor: scheme.outlineVariant,
@@ -56,6 +57,7 @@ ThemeData appTheme() {
       surfaceTintColor: Colors.transparent,
       centerTitle: false,
       titleTextStyle: TextStyle(
+        fontFamily: 'Roboto',
         color: scheme.onSurface,
         fontSize: 22,
         fontWeight: FontWeight.w700,
@@ -73,7 +75,11 @@ ThemeData appTheme() {
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         minimumSize: const Size(48, 48),
-        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        textStyle: const TextStyle(
+          fontFamily: 'Roboto',
+          fontSize: 15,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     ),
     iconButtonTheme: IconButtonThemeData(
@@ -86,6 +92,7 @@ ThemeData appTheme() {
       shape: const StadiumBorder(),
       labelStyle: WidgetStateTextStyle.resolveWith(
         (states) => TextStyle(
+          fontFamily: 'Roboto',
           color: states.contains(WidgetState.selected)
               ? scheme.onPrimary
               : scheme.onSurface,
@@ -136,6 +143,7 @@ ThemeData appTheme() {
       ),
       labelTextStyle: WidgetStateProperty.resolveWith(
         (states) => TextStyle(
+          fontFamily: 'Roboto',
           fontSize: 11,
           color: states.contains(WidgetState.selected)
               ? scheme.onSurface

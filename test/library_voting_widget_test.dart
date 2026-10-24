@@ -229,6 +229,7 @@ void main() {
         RepaintBoundary(
           key: captureKey,
           child: MaterialApp(
+            debugShowCheckedModeBanner: false,
             theme: appTheme(),
             home: Scaffold(
               body: SafeArea(

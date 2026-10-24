@@ -95,6 +95,7 @@ class AppController extends ChangeNotifier {
     int? maxScore,
     List<Track>? source,
     Map<String, Rating>? scores,
+    String? title,
   }) async {
     final snapshot = shuffledTracks(
       source ?? tracks,
@@ -107,8 +108,8 @@ class AppController extends ChangeNotifier {
       snapshot,
       0,
       title: minScore == null && maxScore == null
-          ? listTitle
-          : '$listTitle · $minScore–$maxScore баллов',
+          ? title ?? listTitle
+          : '${title ?? listTitle} · $minScore–$maxScore баллов',
       shuffled: true,
     );
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app_controller.dart';
 import '../data/models.dart';
+import '../data/genre_filter.dart';
 import '../downloads/download_record.dart';
 import '../playback/shuffle_tracks.dart';
 import 'catalog_widgets.dart';
@@ -54,25 +55,32 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     final app = widget.app;
     final account = app.account?.id,
         ratings = Map<String, Rating>.of(app.ratings);
-    final range = await showModalBottomSheet<ScoreRange>(
+    final known = {for (final track in app.favoriteTracks) track.id: track};
+    final snapshot = [
+      for (final track in tracks)
+        track.genres.isEmpty ? known[track.id] ?? track : track,
+    ];
+    final selection = await showModalBottomSheet<ShuffleSelection>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      builder: (_) => ShuffleSheet(
-        tracks: List.of(tracks),
-        ratings: ratings,
-        title: 'Скачанное',
-      ),
+      builder: (_) =>
+          ShuffleSheet(tracks: snapshot, ratings: ratings, title: 'Скачанное'),
     );
-    if (range == null || account != app.account?.id) return;
+    if (selection == null || account != app.account?.id) return;
     final selected = shuffledTracks(
-      tracks,
+      filterTracksByGenreAndScore(snapshot, ratings, groups: selection.genres),
       ratings,
-      minScore: range.min,
-      maxScore: range.max,
+      minScore: selection.scores.min,
+      maxScore: selection.scores.max,
     );
     if (selected.isEmpty) return;
-    await app.music.playList(selected, 0, title: 'Скачанное', shuffled: true);
+    await app.music.playList(
+      selected,
+      0,
+      title: selection.titleFor('Скачанное'),
+      shuffled: true,
+    );
   }
 
   @override

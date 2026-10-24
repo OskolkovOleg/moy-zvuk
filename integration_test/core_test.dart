@@ -9,6 +9,10 @@ import '../test/zvuk_api_test.dart' as api;
 import '../test/shuffle_test.dart' as shuffle;
 import '../test/rating_position_test.dart' as positions;
 import '../test/library_display_order_test.dart' as display_order;
+import '../test/genre_metadata_test.dart' as genre_metadata;
+import '../test/genre_filter_test.dart' as genre_filter;
+import '../test/genre_api_test.dart' as genre_api;
+import '../test/genre_cache_test.dart' as genre_cache;
 
 import '../test/catalog_api_test.dart' as catalog;
 import '../test/collection_controller_test.dart' as collection;
@@ -45,4 +49,8 @@ void main() {
   group('Shuffle', shuffle.main);
   group('Rating positions', positions.main);
   group('Stable library rows', display_order.main);
+  group('Genre metadata', genre_metadata.main);
+  group('Genre filters', genre_filter.main);
+  group('Genre API', genre_api.main);
+  group('Genre cache', genre_cache.main);
 }

@@ -1,3 +1,7 @@
+import 'genre_metadata.dart';
+
+export 'genre_metadata.dart';
+
 class Track {
   const Track({
     required this.id,
@@ -8,31 +12,47 @@ class Track {
     this.artistIds = const [],
     this.artistNames = const [],
     this.releaseId,
+    this.genres = const [],
+    this.genreSource,
   });
   final String id, title, artists;
   final int duration;
   final String? imageUrl, releaseId;
   final List<String> artistIds;
   final List<String> artistNames;
+  final List<TrackGenre> genres;
+  final GenreSource? genreSource;
 
-  factory Track.fromApi(Map<String, dynamic> json) => Track(
-    id: json['id'].toString(),
-    title: json['title'] as String? ?? 'Недоступный трек',
-    artists: (json['artists'] as List? ?? [])
-        .map((a) => a['title'] ?? '')
-        .join(', '),
-    duration: (json['duration'] as num? ?? 0).toInt(),
-    imageUrl: artwork(json['release']?['image']?['src']),
-    releaseId: json['release']?['id']?.toString(),
-    artistIds: (json['artists'] as List? ?? [])
-        .where((a) => a['id'] != null)
-        .map((a) => a['id'].toString())
-        .toList(),
-    artistNames: (json['artists'] as List? ?? [])
-        .where((a) => a['id'] != null)
-        .map((a) => a['title']?.toString() ?? 'Артист')
-        .toList(),
-  );
+  factory Track.fromApi(Map<String, dynamic> json) {
+    final ownGenres = TrackGenre.listFromJson(json['genres']);
+    final releaseGenres = TrackGenre.listFromJson(json['release']?['genres']);
+    final genres = ownGenres.isNotEmpty ? ownGenres : releaseGenres;
+    return Track(
+      id: json['id'].toString(),
+      title: json['title'] as String? ?? 'Недоступный трек',
+      artists: (json['artists'] as List? ?? [])
+          .map((a) => a['title'] ?? '')
+          .join(', '),
+      duration: (json['duration'] as num? ?? 0).toInt(),
+      imageUrl: artwork(json['release']?['image']?['src']),
+      releaseId: json['release']?['id']?.toString(),
+      artistIds: (json['artists'] as List? ?? [])
+          .where((a) => a['id'] != null)
+          .map((a) => a['id'].toString())
+          .toList(),
+      artistNames: (json['artists'] as List? ?? [])
+          .where((a) => a['id'] != null)
+          .map((a) => a['title']?.toString() ?? 'Артист')
+          .toList(),
+      genres: genres,
+      genreSource: genres.isEmpty
+          ? null
+          : ownGenres.isNotEmpty
+          ? GenreSource.track
+          : GenreSource.release,
+    );
+  }
+
   factory Track.fromJson(Map<String, dynamic> json) => Track(
     id: json['id'] as String,
     title: json['title'] as String,
@@ -42,6 +62,10 @@ class Track {
     releaseId: json['releaseId'] as String?,
     artistIds: (json['artistIds'] as List? ?? []).cast<String>(),
     artistNames: (json['artistNames'] as List? ?? []).cast<String>(),
+    genres: TrackGenre.listFromJson(json['genres']),
+    genreSource: GenreSource.values
+        .where((source) => source.name == json['genreSource'])
+        .firstOrNull,
   );
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -52,6 +76,8 @@ class Track {
     'releaseId': releaseId,
     'artistIds': artistIds,
     'artistNames': artistNames,
+    'genres': genres.map((g) => g.toJson()).toList(),
+    'genreSource': genreSource?.name,
   };
 }
 

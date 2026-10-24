@@ -4,8 +4,112 @@ import 'package:zvuk_personal/ui/theme.dart';
 import 'package:zvuk_personal/ui/widgets.dart';
 import 'package:zvuk_personal/ui/shuffle_sheet.dart';
 import 'package:zvuk_personal/data/models.dart';
+import 'package:zvuk_personal/data/genre_filter.dart';
+
+import 'ui_capture.dart';
 
 void main() {
+  setUpAll(loadUiFonts);
+  testWidgets(
+    'Genre choices combine with scores and keep the play action visible',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = 1.6;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      const tracks = [
+        Track(
+          id: 'high-rock',
+          title: 'Rock high',
+          genres: [TrackGenre(id: 'r', name: 'Rock')],
+        ),
+        Track(
+          id: 'low-rock',
+          title: 'Rock low',
+          genres: [TrackGenre(id: 'r', name: 'Rock')],
+        ),
+        Track(
+          id: 'pop',
+          title: 'Pop',
+          genres: [TrackGenre(id: 'p', name: 'Pop')],
+        ),
+        Track(id: 'unknown', title: 'Unknown'),
+      ];
+      const ratings = {'high-rock': Rating(14, 5), 'pop': Rating(10, 1)};
+      ShuffleSelection? result;
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: captureKey,
+          child: MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: appTheme(),
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: Center(
+                  child: FilledButton(
+                    onPressed: () async {
+                      result = await showModalBottomSheet<ShuffleSelection>(
+                        context: context,
+                        isScrollControlled: true,
+                        showDragHandle: true,
+                        builder: (_) => const ShuffleSheet(
+                          tracks: tracks,
+                          ratings: ratings,
+                          title: 'Мои песни',
+                        ),
+                      );
+                    },
+                    child: const Text('Открыть'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Открыть'));
+      await tester.pumpAndSettle();
+      expect(find.text('Подходит 4 трека'), findsOneWidget);
+      final rock = find.byKey(const ValueKey('shuffle-genre-rock'));
+      await tester.ensureVisible(rock);
+      await tester.tap(rock);
+      await tester.pumpAndSettle();
+      expect(find.text('Подходит 2 трека'), findsOneWidget);
+      tester
+          .widget<RangeSlider>(find.byKey(const Key('shuffle-score-slider')))
+          .onChanged!(const RangeValues(10, 14));
+      await tester.pumpAndSettle();
+      expect(find.text('Подходит 1 трек'), findsOneWidget);
+      final pop = find.byKey(const ValueKey('shuffle-genre-pop'));
+      await tester.ensureVisible(pop);
+      await tester.tap(pop);
+      await tester.pumpAndSettle();
+      expect(find.text('Подходит 2 трека'), findsOneWidget);
+      final play = find.byKey(const Key('start-shuffle'));
+      expect(play.hitTestable(), findsOneWidget);
+      expect(tester.getBottomRight(play).dy, lessThanOrEqualTo(640));
+      expect(tester.takeException(), isNull);
+      await captureUi(tester, 'shuffle-genres-large-text');
+      await tester.tap(play);
+      await tester.pumpAndSettle();
+      expect(result!.genres, {GenreGroup.rock, GenreGroup.pop});
+      expect(result!.scores.min, 10);
+      expect(result!.scores.max, 14);
+      expect(
+        filterTracksByGenreAndScore(
+          tracks,
+          ratings,
+          groups: result!.genres,
+          minScore: result!.scores.min,
+          maxScore: result!.scores.max,
+        ).map((t) => t.id),
+        ['high-rock', 'pop'],
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
   testWidgets(
     'Rank label shows shared ranges and single places at large text',
     (tester) async {
