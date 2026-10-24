@@ -35,7 +35,9 @@ class LibraryFilterControl extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final filter = app.libraryFilter;
-    final label = filter.label.replaceAll(' баллов', '\u00a0баллов');
+    final label = filter.label
+        .replaceAll('–', '\u2060–\u2060')
+        .replaceAll(' баллов', '\u00a0баллов');
     return Material(
       color: filter.isActive
           ? scheme.surfaceContainerHigh
