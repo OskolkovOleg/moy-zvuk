@@ -121,11 +121,26 @@ class LibraryStore {
   }
 
   Future<void> saveTracks(String account, String list, List<Track> tracks) =>
-      put(account, 'list:$list', tracks.map((t) => t.toJson()).toList());
-  Future<List<Track>> loadTracks(String account, String list) async =>
-      ((await get(account, 'list:$list')) as List? ?? [])
-          .map((j) => Track.fromJson(j))
-          .toList();
+      put(account, 'list:$list', [
+        for (final track
+            in list == 'favorites' ? _uniqueFavoriteTracks(tracks) : tracks)
+          track.toJson(),
+      ]);
+
+  Future<List<Track>> loadTracks(String account, String list) async {
+    if (list != 'favorites') {
+      return _storedTracks(db, account, 'list:$list');
+    }
+    // Repair old caches offline, atomically with votes and remote merges.
+    return db.transaction((txn) async {
+      final cached = await _storedTracks(txn, account, 'list:favorites');
+      final unique = _uniqueFavoriteTracks(cached);
+      if (unique.length != cached.length) {
+        await _writeTracks(txn, account, 'list:favorites', unique);
+      }
+      return unique;
+    });
+  }
 
   Future<List<String>> loadOrder(String account, String list) async =>
       List<String>.from(await get(account, 'order:$list') as List? ?? []);

@@ -1,5 +1,12 @@
 part of 'library_store.dart';
 
+// Favorite membership is unique by catalog ID. Playlists and queue occurrences
+// deliberately keep their multiplicity; titles do not identify a recording.
+List<Track> _uniqueFavoriteTracks(Iterable<Track> tracks) {
+  final seen = <String>{};
+  return tracks.where((track) => seen.add(track.id)).toList();
+}
+
 Future<void> _createScoreData(
   DatabaseExecutor db, {
   bool legacy = false,
@@ -69,8 +76,14 @@ Future<void> _collectTrack(
   String account,
   Track track,
 ) async {
-  final favorites = await _storedTracks(db, account, 'list:favorites');
-  if (favorites.any((t) => t.id == track.id)) return;
+  final stored = await _storedTracks(db, account, 'list:favorites');
+  final favorites = _uniqueFavoriteTracks(stored);
+  if (favorites.any((t) => t.id == track.id)) {
+    if (favorites.length != stored.length) {
+      await _writeTracks(db, account, 'list:favorites', favorites);
+    }
+    return;
+  }
   await _writeTracks(db, account, 'list:favorites', [track, ...favorites]);
   final pending = await _storedTracks(db, account, 'pending-favorite-adds');
   if (!pending.any((t) => t.id == track.id)) {
@@ -82,8 +95,10 @@ Future<void> _collectTrack(
 }
 
 extension ScoreLibraryStore on LibraryStore {
-  Future<List<Track>> pendingFavoriteAdds(String account) =>
-      _storedTracks(db, account, 'pending-favorite-adds');
+  Future<List<Track>> pendingFavoriteAdds(String account) async =>
+      _uniqueFavoriteTracks(
+        await _storedTracks(db, account, 'pending-favorite-adds'),
+      );
 
   Future<void> completeFavoriteAdd(String account, String trackId) =>
       db.transaction((txn) async {
@@ -108,10 +123,10 @@ extension ScoreLibraryStore on LibraryStore {
           'pending-favorite-adds',
         );
         final remoteIds = remote.map((t) => t.id).toSet();
-        final merged = [
+        final merged = _uniqueFavoriteTracks([
           ...pending.where((t) => !remoteIds.contains(t.id)),
           ...remote,
-        ];
+        ]);
         await _writeTracks(txn, account, 'list:favorites', merged);
         return merged;
       });

@@ -64,6 +64,12 @@ class FavoriteFixtureApi extends ZvukApi {
   final FavoriteFixtureState state;
 
   @override
+  Future<List<String>> favoriteIds() async {
+    if (state.failRead) throw const ZvukException('Нет сети');
+    return state.likes.toList();
+  }
+
+  @override
   Future<String> streamUrl(
     String id, {
     AudioQuality quality = AudioQuality.high,

@@ -7,9 +7,15 @@ extension ScoreLibraryController on AppController {
     try {
       await _edit((activeApi, accountId) async {
         final pending = await store.pendingFavoriteAdds(accountId);
+        if (pending.isEmpty) return;
+        final remoteIds = (await activeApi.favoriteIds()).toSet();
         for (final track in pending) {
           if (_disposed || api != activeApi || account?.id != accountId) return;
-          await activeApi.setCollectionItem(track.id, liked: true);
+          // A previous write may have succeeded before its response was lost.
+          if (!remoteIds.contains(track.id)) {
+            await activeApi.setCollectionItem(track.id, liked: true);
+            remoteIds.add(track.id);
+          }
           await store.completeFavoriteAdd(accountId, track.id);
         }
       });

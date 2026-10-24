@@ -264,16 +264,18 @@ class ZvukApi {
         .toList();
   }
 
-  Future<List<Track>> favorites() async {
+  Future<List<String>> favoriteIds() async {
     final data = await _graph(
       'userCollection',
       'query userCollection { collection { tracks { id } } }',
     );
-    final ids = (data['collection']['tracks'] as List)
+    return (data['collection']['tracks'] as List)
         .map((e) => e['id'].toString())
+        .toSet()
         .toList();
-    return tracks(ids);
   }
+
+  Future<List<Track>> favorites() async => tracks(await favoriteIds());
 
   Future<List<PlaylistInfo>> playlists() async {
     final data = await _graph(

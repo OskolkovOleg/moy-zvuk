@@ -152,36 +152,44 @@ void main() {
     expect(offsets, [0, 100]);
     api.close();
   });
-  test('Favorite hydration preserves source order and missing IDs', () async {
-    final api = ZvukApi(
-      'test',
-      client: MockClient((req) async {
-        final name = jsonDecode(req.body)['operationName'];
-        return http.Response(
-          jsonEncode({
-            'data': name == 'userCollection'
-                ? {
-                    'collection': {
-                      'tracks': [
-                        {'id': '3'},
-                        {'id': '1'},
-                        {'id': '2'},
-                      ],
+  test(
+    'Favorite hydration removes repeated IDs, preserving order and missing IDs',
+    () async {
+      final api = ZvukApi(
+        'test',
+        client: MockClient((req) async {
+          final name = jsonDecode(req.body)['operationName'];
+          if (name == 'getTracks') {
+            expect(jsonDecode(req.body)['variables']['ids'], ['3', '1', '2']);
+          }
+          return http.Response(
+            jsonEncode({
+              'data': name == 'userCollection'
+                  ? {
+                      'collection': {
+                        'tracks': [
+                          {'id': '3'},
+                          {'id': '1'},
+                          {'id': '3'},
+                          {'id': '2'},
+                          {'id': '1'},
+                        ],
+                      },
+                    }
+                  : {
+                      'getTracks': [track(1), track(3)],
                     },
-                  }
-                : {
-                    'getTracks': [track(1), track(3)],
-                  },
-          }),
-          200,
-        );
-      }),
-    );
-    final result = await api.favorites();
-    expect(result.map((t) => t.id), ['3', '1', '2']);
-    expect(result.last.title, 'Недоступный трек');
-    api.close();
-  });
+            }),
+            200,
+          );
+        }),
+      );
+      final result = await api.favorites();
+      expect(result.map((t) => t.id), ['3', '1', '2']);
+      expect(result.last.title, 'Недоступный трек');
+      api.close();
+    },
+  );
   test(
     'Profile rejects anonymous account and redacts upstream failure',
     () async {

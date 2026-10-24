@@ -112,6 +112,7 @@ void main() {
       app.ratings = await store.ratings('owner');
       expect(app.visibleTracks.map((t) => t.id), ['b', 'a']);
       final entered = Completer<void>(), release = Completer<void>();
+      var synced = false;
       app.api = ZvukApi(
         'fixture',
         client: MockClient((req) async {
@@ -119,6 +120,7 @@ void main() {
             case 'changeCollection':
               entered.complete();
               await release.future;
+              synced = true;
               return response({
                 'collection': {'addItem': null},
               });
@@ -131,7 +133,7 @@ void main() {
                 'collection': {
                   'tracks': [
                     {'id': 'a'},
-                    {'id': 'b'},
+                    if (synced) {'id': 'b'},
                   ],
                 },
               });
@@ -345,6 +347,11 @@ void main() {
     app.api = ZvukApi(
       'fixture',
       client: MockClient((req) async {
+        if (jsonDecode(req.body)['operationName'] == 'userCollection') {
+          return response({
+            'collection': {'tracks': []},
+          });
+        }
         expect(jsonDecode(req.body)['operationName'], 'changeCollection');
         expect(jsonDecode(req.body)['query'], contains('addItem'));
         writes++;
@@ -392,8 +399,11 @@ void main() {
       app.api = ZvukApi(
         'fixture',
         client: MockClient(
-          (_) async => response({
-            'collection': {'addItem': null},
+          (req) async => response({
+            'collection':
+                jsonDecode(req.body)['operationName'] == 'userCollection'
+                ? {'tracks': []}
+                : {'addItem': null},
           }),
         ),
       );
@@ -409,7 +419,12 @@ void main() {
       final entered = Completer<void>(), release = Completer<void>();
       final old = ZvukApi(
         'fixture',
-        client: MockClient((_) async {
+        client: MockClient((req) async {
+          if (jsonDecode(req.body)['operationName'] == 'userCollection') {
+            return response({
+              'collection': {'tracks': []},
+            });
+          }
           entered.complete();
           await release.future;
           return response({
@@ -448,13 +463,16 @@ void main() {
 
   test('A stale remote read cannot remove a locally collected song', () async {
     final entered = Completer<void>(), release = Completer<void>();
+    var reads = 0;
     app.api = ZvukApi(
       'fixture',
       client: MockClient((req) async {
         switch (jsonDecode(req.body)['operationName']) {
           case 'userCollection':
-            entered.complete();
-            await release.future;
+            if (reads++ == 0) {
+              entered.complete();
+              await release.future;
+            }
             return response({
               'collection': {'tracks': []},
             });
@@ -475,5 +493,61 @@ void main() {
     expect(app.tracks.single.id, track.id);
     expect((await store.loadTracks('owner', 'favorites')).single.id, track.id);
     expect(app.scoreFor(track), 10);
+  });
+
+  test(
+    'An existing remote favorite is acknowledged without adding again',
+    () async {
+      await store.vote('owner', track, 1, addToLibrary: true);
+      app.api = ZvukApi(
+        'fixture',
+        client: MockClient((req) async {
+          expect(jsonDecode(req.body)['operationName'], 'userCollection');
+          return response({
+            'collection': {
+              'tracks': [
+                {'id': track.id},
+                {'id': track.id},
+              ],
+            },
+          });
+        }),
+      );
+      await app.syncLibraryAdds();
+      expect(await store.pendingFavoriteAdds('owner'), isEmpty);
+      expect(trackScore(track.id, await store.ratings('owner')), 10);
+      expect(await store.loadTracks('owner', 'favorites'), hasLength(1));
+    },
+  );
+
+  test('A lost write response is retried by reading membership, without a second add', () async {
+    var remoteHasTrack = false, writes = 0;
+    app.api = ZvukApi(
+      'fixture',
+      client: MockClient((req) async {
+        switch (jsonDecode(req.body)['operationName']) {
+          case 'userCollection':
+            return response({
+              'collection': {
+                'tracks': [
+                  if (remoteHasTrack) {'id': track.id},
+                ],
+              },
+            });
+          case 'changeCollection':
+            writes++;
+            remoteHasTrack = true;
+            return http.Response('{}', 503);
+          default:
+            throw StateError('Unexpected request');
+        }
+      }),
+    );
+    await app.vote(track, 1);
+    await app.syncLibraryAdds();
+    expect(writes, 1);
+    expect(await store.pendingFavoriteAdds('owner'), isEmpty);
+    expect(app.scoreFor(track), 10);
+    expect(app.favoriteTracks, hasLength(1));
   });
 }
