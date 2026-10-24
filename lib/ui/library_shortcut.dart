@@ -15,7 +15,7 @@ class LibraryShortcut extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(right: 10),
     child: SizedBox(
-      width: 112,
+      width: 124,
       child: Material(
         color: Theme.of(context).colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(20),
@@ -35,6 +35,7 @@ class LibraryShortcut extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 13,
+                    height: 1.25,
                     fontWeight: FontWeight.w500,
                   ),
                 ),

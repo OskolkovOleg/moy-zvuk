@@ -208,7 +208,7 @@ class TrackTile extends StatelessWidget {
       final scheme = Theme.of(context).colorScheme;
       final coverSize = MediaQuery.sizeOf(context).width < 360 ? 48.0 : 56.0;
       return Container(
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
         decoration: BoxDecoration(
           color: current ? scheme.primary.withValues(alpha: .09) : null,
           borderRadius: BorderRadius.circular(12),

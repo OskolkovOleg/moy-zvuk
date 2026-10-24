@@ -161,14 +161,17 @@ class _LibraryScreenState extends State<LibraryScreen> {
                             height: 28,
                           ),
                           const SizedBox(width: 8),
-                          Text(
-                            'Мой Звук',
-                            style: TextStyle(
-                              color: scheme.onSurfaceVariant,
-                              fontWeight: FontWeight.w600,
+                          Expanded(
+                            child: Text(
+                              'Мой Звук',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: scheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
-                          const Spacer(),
                           if (onSettings != null)
                             IconButton(
                               tooltip: 'Настройки',
@@ -185,7 +188,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       ),
                     ),
                     SizedBox(
-                      height: largeText ? 120 : 104,
+                      height:
+                          88 + MediaQuery.textScalerOf(context).scale(13) * 2.5,
                       child: ListView(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.fromLTRB(20, 8, 10, 12),

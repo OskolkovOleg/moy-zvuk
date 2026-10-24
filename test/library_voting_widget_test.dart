@@ -85,6 +85,7 @@ class _App extends AppController {
 }
 
 void main() {
+  setUpAll(loadUiFonts);
   const a = Track(id: 'a', title: 'Первая');
   const b = Track(id: 'b', title: 'Вторая');
   late _App app;
