@@ -111,6 +111,7 @@ void main() {
       expect(rows(tester), ['a', 'b']);
     }
     expect(app.scoreFor(b), 14);
+    expect(find.text('14'), findsOneWidget);
     expect(app.scoreFor(a), 9);
     expect(app.positionFor(b)!.label, '1');
     await tester.tap(find.text(b.title));
@@ -133,6 +134,7 @@ void main() {
       expect(rows(tester), ['b', 'a']);
     }
     expect(app.scoreFor(b), 6);
+    expect(find.text('6'), findsOneWidget);
     expect(app.scoreFor(a), 9);
     await tester.drag(
       find.byType(CustomScrollView).first,
