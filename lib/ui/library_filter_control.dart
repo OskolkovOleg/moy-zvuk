@@ -35,6 +35,7 @@ class LibraryFilterControl extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final filter = app.libraryFilter;
+    final label = filter.label.replaceAll(' баллов', '\u00a0баллов');
     return Material(
       color: filter.isActive
           ? scheme.surfaceContainerHigh
@@ -64,7 +65,7 @@ class LibraryFilterControl extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        filter.isActive ? filter.label : 'Жанры и баллы',
+                        filter.isActive ? label : 'Жанры и баллы',
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(

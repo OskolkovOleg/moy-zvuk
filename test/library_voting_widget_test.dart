@@ -215,7 +215,20 @@ void main() {
         const Track(
           id: 'rock',
           title: 'Рок',
-          genres: [TrackGenre(id: 'r', name: 'Rock')],
+          genres: [
+            TrackGenre(id: 'r', name: 'Rock'),
+            TrackGenre(id: 'p', name: 'Pop'),
+            TrackGenre(id: 'h', name: 'Hip-Hop'),
+            TrackGenre(id: 'e', name: 'Electronic'),
+            TrackGenre(id: 'i', name: 'Indie'),
+            TrackGenre(id: 'm', name: 'Metal'),
+            TrackGenre(id: 'j', name: 'Jazz'),
+            TrackGenre(id: 'b', name: 'Blues'),
+            TrackGenre(id: 'f', name: 'Folk'),
+            TrackGenre(id: 'c', name: 'Classical'),
+            TrackGenre(id: 'a', name: 'Ambient'),
+            TrackGenre(id: 's', name: 'Soundtrack'),
+          ],
         ),
       ];
       final filter = LibraryFilter(
@@ -249,6 +262,20 @@ void main() {
             .values,
         const RangeValues(100, 200),
       );
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('shuffle-genre-soundtrack')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('reset-filter-draft')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('apply-library-filter')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(find.text('Фильтры').hitTestable(), findsOneWidget);
+      await captureUi(tester, 'library-filter-many-genres-large');
       await tester.tap(find.byKey(const Key('reset-filter-draft')));
       await tester.pumpAndSettle();
       expect(find.text('Подходит 1 трек'), findsOneWidget);
@@ -258,6 +285,17 @@ void main() {
       await tester.tap(find.byKey(const Key('clear-library-filter')));
       await tester.pumpAndSettle();
       expect(app.visibleTracks.single.id, 'rock');
+      await tester.tap(find.byKey(const Key('library-filter')));
+      await tester.pumpAndSettle();
+      final rock = find.byKey(const ValueKey('shuffle-genre-rock'));
+      await tester.ensureVisible(rock);
+      await tester.tap(rock);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('apply-library-filter')));
+      await tester.pumpAndSettle();
+      expect(app.libraryFilter.genres, {GenreGroup.rock});
+      expect(app.libraryFilter.minScore, isNull);
+      expect(app.libraryFilter.maxScore, isNull);
       expect(music.played, isEmpty);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());

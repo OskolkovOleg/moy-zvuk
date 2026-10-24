@@ -131,6 +131,38 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    widget.libraryMode ? 'Фильтры' : 'Перемешать',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: scheme.onSurfaceVariant),
+                        ),
+                      ),
+                      if (widget.libraryMode)
+                        TextButton(
+                          key: const Key('reset-filter-draft'),
+                          onPressed: reset,
+                          child: const Text('Сбросить'),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
@@ -138,30 +170,7 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      widget.libraryMode ? 'Фильтры' : 'Перемешать',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            widget.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: scheme.onSurfaceVariant),
-                          ),
-                        ),
-                        if (widget.libraryMode)
-                          TextButton(
-                            key: const Key('reset-filter-draft'),
-                            onPressed: reset,
-                            child: const Text('Сбросить'),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 8),
                     Text(
                       'Диапазон баллов',
                       style: Theme.of(context).textTheme.titleMedium,
@@ -206,40 +215,46 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
                               );
                             }),
                     ),
-                    if (availableGenres.isNotEmpty) ...[
+                    if (availableGenres.isNotEmpty || widget.libraryMode) ...[
                       const SizedBox(height: 12),
                       Text(
                         'Жанры',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          FilterChip(
-                            key: const Key('shuffle-genre-all'),
-                            label: const Text('Все жанры'),
-                            selected: selectedGenres.isEmpty,
-                            onSelected: (_) => setState(selectedGenres.clear),
-                          ),
-                          for (final genre in GenreGroup.values.where(
-                            availableGenres.contains,
-                          ))
+                      if (availableGenres.isEmpty)
+                        Text(
+                          'Для этого списка нет доступных жанров.',
+                          style: TextStyle(color: scheme.onSurfaceVariant),
+                        )
+                      else
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
                             FilterChip(
-                              key: ValueKey('shuffle-genre-${genre.name}'),
-                              label: Text(genre.label),
-                              selected: selectedGenres.contains(genre),
-                              onSelected: (selected) => setState(() {
-                                if (selected) {
-                                  selectedGenres.add(genre);
-                                } else {
-                                  selectedGenres.remove(genre);
-                                }
-                              }),
+                              key: const Key('shuffle-genre-all'),
+                              label: const Text('Все жанры'),
+                              selected: selectedGenres.isEmpty,
+                              onSelected: (_) => setState(selectedGenres.clear),
                             ),
-                        ],
-                      ),
+                            for (final genre in GenreGroup.values.where(
+                              availableGenres.contains,
+                            ))
+                              FilterChip(
+                                key: ValueKey('shuffle-genre-${genre.name}'),
+                                label: Text(genre.label),
+                                selected: selectedGenres.contains(genre),
+                                onSelected: (selected) => setState(() {
+                                  if (selected) {
+                                    selectedGenres.add(genre);
+                                  } else {
+                                    selectedGenres.remove(genre);
+                                  }
+                                }),
+                              ),
+                          ],
+                        ),
                     ],
                   ],
                 ),
