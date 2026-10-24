@@ -101,16 +101,16 @@ class ArtistLink extends StatelessWidget {
                     track.artists,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: style.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+                    style: style,
                   ),
                 ),
                 const SizedBox(width: 2),
                 Icon(
                   Icons.chevron_right_rounded,
                   size: style.fontSize ?? 14,
-                  color: Theme.of(context).colorScheme.primary,
+                  color:
+                      style.color ??
+                      Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ],
             ),

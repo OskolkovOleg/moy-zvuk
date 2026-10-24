@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
@@ -96,7 +97,7 @@ class MiniPlayer extends StatelessWidget {
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: scheme.primary,
+                                        color: scheme.onSurfaceVariant,
                                       ),
                                     ),
                                   ),
@@ -262,76 +263,105 @@ class _PlayerSheetState extends State<PlayerSheet> {
       final scheme = Theme.of(context).colorScheme;
       return Scaffold(
         backgroundColor: scheme.surface,
-        body: SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
-                child: Row(
-                  children: [
-                    IconButton(
-                      tooltip: 'Свернуть плеер',
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        size: 30,
-                      ),
-                    ),
-                    Expanded(
-                      child: Column(
-                        children: [
-                          Text(
+        body: Stack(
+          children: [
+            if (track?.imageUrl != null)
+              Positioned.fill(child: _PlayerBackdrop(track!.imageUrl!)),
+            SafeArea(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          tooltip: 'Свернуть плеер',
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: 30,
+                          ),
+                        ),
+                        Expanded(
+                          child: Column(
+                            children: [
+                              Text(
+                                showQueue
+                                    ? 'Очередь'
+                                    : music.isShuffled
+                                    ? 'Вперемешку'
+                                    : 'Сейчас играет',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                music.sourceTitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: showQueue ? 'Плеер' : 'Очередь',
+                          onPressed: () =>
+                              setState(() => showQueue = !showQueue),
+                          icon: Icon(
                             showQueue
-                                ? 'Очередь'
-                                : music.isShuffled
-                                ? 'Вперемешку'
-                                : 'Сейчас играет',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
+                                ? Icons.album_outlined
+                                : Icons.queue_music_rounded,
                           ),
-                          const SizedBox(height: 3),
-                          Text(
-                            music.sourceTitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: scheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    IconButton(
-                      tooltip: showQueue ? 'Плеер' : 'Очередь',
-                      onPressed: () => setState(() => showQueue = !showQueue),
-                      icon: Icon(
-                        showQueue
-                            ? Icons.album_outlined
-                            : Icons.queue_music_rounded,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (track == null)
-                const Expanded(
-                  child: EmptyState(
-                    icon: Icons.queue_music_rounded,
-                    title: 'Очередь пуста',
-                    message: 'Выбери песню в библиотеке или поиске.',
                   ),
-                )
-              else if (showQueue)
-                Expanded(child: QueueView(app))
-              else
-                Expanded(child: _PlayerContent(app, track)),
-            ],
-          ),
+                  if (track == null)
+                    const Expanded(
+                      child: EmptyState(
+                        icon: Icons.queue_music_rounded,
+                        title: 'Очередь пуста',
+                        message: 'Выбери песню в библиотеке или поиске.',
+                      ),
+                    )
+                  else if (showQueue)
+                    Expanded(child: QueueView(app))
+                  else
+                    Expanded(child: _PlayerContent(app, track)),
+                ],
+              ),
+            ),
+          ],
         ),
       );
     },
+  );
+}
+
+class _PlayerBackdrop extends StatelessWidget {
+  const _PlayerBackdrop(this.url);
+  final String url;
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+    child: ClipRect(
+      child: Opacity(
+        opacity: .18,
+        child: ImageFiltered(
+          imageFilter: ui.ImageFilter.blur(sigmaX: 48, sigmaY: 48),
+          child: Image.network(
+            url,
+            cacheWidth: 256,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => const SizedBox.expand(),
+          ),
+        ),
+      ),
+    ),
   );
 }

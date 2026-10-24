@@ -28,27 +28,18 @@ class SettingsSection extends StatelessWidget {
             child: Text(
               title,
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: scheme.primary,
-                fontWeight: FontWeight.w700,
+                color: scheme.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
           Material(
             color: scheme.surfaceContainer,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(24),
             clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
-                for (var i = 0; i < children.length; i++) ...[
-                  if (i > 0)
-                    Divider(
-                      height: 1,
-                      indent: 52,
-                      endIndent: 16,
-                      color: scheme.outlineVariant.withValues(alpha: .6),
-                    ),
-                  children[i],
-                ],
+                for (var i = 0; i < children.length; i++) ...[children[i]],
               ],
             ),
           ),
@@ -83,12 +74,12 @@ class SettingsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListTile(
-    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
     horizontalTitleGap: 12,
-    leading: Icon(icon, size: 22),
+    leading: Icon(icon, size: 24),
     title: Text(
       title,
-      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
     ),
     subtitle: Padding(
       padding: const EdgeInsets.only(top: 3),

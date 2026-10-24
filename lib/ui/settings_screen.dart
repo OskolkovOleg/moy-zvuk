@@ -114,7 +114,7 @@ class WelcomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               const Text(
-                'Расставляй песни стрелками и слушай сверху вниз. Или добавляй +1 и −1, чтобы любимые треки поднимались по баллам.',
+                'Добавляй +1 и −1, чтобы сохранить самое ценное. Слушай по баллам или перемешивай подходящие песни.',
                 style: TextStyle(fontSize: 17, height: 1.45),
               ),
               const SizedBox(height: 36),

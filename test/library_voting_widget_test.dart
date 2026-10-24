@@ -1,16 +1,24 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:audio_service/audio_service.dart' hide Rating;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zvuk_personal/app_controller.dart';
 import 'package:zvuk_personal/data/library_store.dart';
 import 'package:zvuk_personal/data/models.dart';
+import 'package:zvuk_personal/data/audio_preferences.dart';
+import 'package:zvuk_personal/data/catalog_models.dart';
 import 'package:zvuk_personal/downloads/download_manager.dart';
 import 'package:zvuk_personal/playback/music_handler.dart';
 import 'package:zvuk_personal/playback/playback_queue.dart';
+import 'package:zvuk_personal/playback/sleep_timer.dart';
 import 'package:zvuk_personal/ui/app.dart';
 import 'package:zvuk_personal/ui/library_screen.dart';
 import 'package:zvuk_personal/ui/widgets.dart';
+import 'package:zvuk_personal/ui/theme.dart';
+import 'package:zvuk_personal/ui/catalog_carousel.dart';
+
+import 'ui_capture.dart';
 
 class _Store implements LibraryStore {
   @override
@@ -30,6 +38,12 @@ class _Music implements MusicHandler {
   final error = ValueNotifier<String?>(null);
   @override
   final playlist = PlaybackQueue();
+  @override
+  AudioPreferences get audioPreferences => const AudioPreferences();
+  @override
+  AudioServiceRepeatMode get repeatMode => AudioServiceRepeatMode.none;
+  @override
+  final sleepTimer = SleepTimerState();
   @override
   Future<void> Function(String account, Track track, int delta)?
   onNotificationVote;
@@ -92,6 +106,163 @@ void main() {
       .widgetList<TrackTile>(find.byType(TrackTile))
       .map((tile) => tile.track.id)
       .toList();
+
+  testWidgets(
+    'Back to top returns from the end without refreshing or sorting',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 720);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      app.tracks = List.generate(
+        800,
+        (i) => Track(id: '$i', title: 'Песня $i', artists: 'Исполнитель'),
+      );
+      await tester.pumpWidget(
+        RepaintBoundary(key: captureKey, child: ZvukApp(app)),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('library-back-to-top')), findsNothing);
+      final first = app.tracks.first;
+      await app.vote(first, -1);
+      await tester.pumpAndSettle();
+      final order = app.visibleTracks.map((t) => t.id).toList();
+      await captureUi(tester, 'library');
+      final scrollView = find.byType(CustomScrollView).first;
+      await tester.drag(scrollView, const Offset(0, -1000));
+      await tester.pumpAndSettle();
+      final scroll = tester.widget<CustomScrollView>(scrollView).controller!;
+      scroll.jumpTo(scroll.position.maxScrollExtent);
+      await tester.pumpAndSettle();
+      final top = find.byKey(const Key('library-back-to-top'));
+      expect(top.hitTestable(), findsOneWidget);
+      expect(
+        tester.getBottomRight(top).dy,
+        lessThan(tester.getTopLeft(find.byType(NavigationBar)).dy),
+      );
+      await captureUi(tester, 'library-scrolled');
+      await tester.tap(top);
+      await tester.pumpAndSettle();
+      expect(scroll.offset, 0);
+      expect(top, findsNothing);
+      expect(
+        find.byKey(const Key('play-from-top')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('shuffle-list')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(app.visibleTracks.map((t) => t.id), order);
+      expect(app.scoreFor(first), 8);
+      expect(music.played, isEmpty);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets('Library and settings fit a narrow screen with enlarged text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 1.6;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    app.tracks = [
+      const Track(
+        id: 'long',
+        title: 'Очень длинное название любимой песни',
+        artists: 'Название группы и второй исполнитель',
+      ),
+    ];
+    await tester.pumpWidget(
+      RepaintBoundary(key: captureKey, child: ZvukApp(app)),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester.getSize(find.byType(TrackTile).first).height,
+      lessThanOrEqualTo(90),
+    );
+    expect(
+      tester
+          .getSize(find.byTooltip('Плюс один: ${app.tracks.first.title}'))
+          .width,
+      greaterThanOrEqualTo(48),
+    );
+    expect(tester.takeException(), isNull);
+    await captureUi(tester, 'library-large-text');
+    await tester.tap(find.byTooltip('Настройки'));
+    await tester.pumpAndSettle();
+    expect(find.text('Воспроизведение'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await captureUi(tester, 'settings-large-text');
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets(
+    'Cover shelves preserve tap targets and long titles at large text',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = 1.6;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final items = [
+        const CatalogItem(
+          id: 'p',
+          title: 'Музыка для долгой дороги домой',
+          kind: CatalogKind.playlist,
+          subtitle: 'Знакомые песни и новые открытия',
+        ),
+        const CatalogItem(
+          id: 'a',
+          title: 'Новые имена',
+          kind: CatalogKind.album,
+        ),
+      ];
+      CatalogItem? opened;
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: captureKey,
+          child: MaterialApp(
+            theme: appTheme(),
+            home: Scaffold(
+              body: SafeArea(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.all(20),
+                      child: Text(
+                        'Для тебя',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    CatalogCarousel(
+                      items: items,
+                      onOpen: (item) => opened = item,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await captureUi(tester, 'covers-large-text');
+      await tester.tap(find.text(items.first.title));
+      expect(opened?.id, 'p');
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   testWidgets('Repeated taps at the same point keep targeting the same song', (
     tester,

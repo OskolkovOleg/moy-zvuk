@@ -93,9 +93,7 @@ class RatingControls extends StatelessWidget {
                   style: TextStyle(
                     fontSize: compact ? 14 : 17,
                     fontWeight: FontWeight.w700,
-                    color: score > 0
-                        ? Theme.of(context).colorScheme.primary
-                        : null,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -138,7 +136,7 @@ class RatingPositionLabel extends StatelessWidget {
       style: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w600,
-        color: scheme.primary,
+        color: scheme.onSurfaceVariant,
       ),
     );
     if (compact) {
@@ -208,6 +206,7 @@ class TrackTile extends StatelessWidget {
     builder: (context, _) {
       final current = app.music.playlist.current?.id == track.id;
       final scheme = Theme.of(context).colorScheme;
+      final coverSize = MediaQuery.sizeOf(context).width < 360 ? 48.0 : 56.0;
       return Container(
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
         decoration: BoxDecoration(
@@ -229,7 +228,7 @@ class TrackTile extends StatelessWidget {
                       Stack(
                         alignment: Alignment.bottomRight,
                         children: [
-                          Artwork(track, size: 48),
+                          Artwork(track, size: coverSize),
                           if (app.music.downloads.forTrack(track.id)?.state ==
                               DownloadState.ready)
                             Positioned(
@@ -278,7 +277,7 @@ class TrackTile extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontWeight: FontWeight.w600,
-                                fontSize: 14,
+                                fontSize: 15,
                                 height: 1.25,
                                 color: current
                                     ? scheme.primary

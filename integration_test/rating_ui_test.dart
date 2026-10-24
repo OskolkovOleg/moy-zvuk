@@ -66,7 +66,7 @@ void main() {
         expect(find.text('Твой счёт'), findsNothing);
         expect(
           tester.getSize(find.byType(TrackTile).first).height,
-          lessThanOrEqualTo(60),
+          lessThanOrEqualTo(72),
         );
         final plus = find.byTooltip('Плюс один: ${a.title}');
         final artwork = find.descendant(

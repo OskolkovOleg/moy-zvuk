@@ -16,3 +16,12 @@ jobs:
       - run: dart format --output=none --set-exit-if-changed lib test integration_test test_driver
       - run: dart analyze --format machine lib test integration_test test_driver
       - run: flutter test
+        env:
+          ZVUK_UI_CAPTURE_DIR: artifacts/ui-review
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ui-review
+          path: artifacts/ui-review
+          if-no-files-found: ignore
+          retention-days: 3

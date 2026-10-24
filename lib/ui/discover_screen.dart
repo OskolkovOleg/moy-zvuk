@@ -5,6 +5,7 @@ import '../data/catalog_models.dart';
 import '../data/models.dart';
 import '../data/zvuk_api.dart';
 import 'catalog_widgets.dart';
+import 'catalog_carousel.dart';
 import 'radio_actions.dart';
 import '../data/wave_source.dart';
 import 'wave_settings.dart';
@@ -199,14 +200,9 @@ class _PlaylistSectionState extends State<_PlaylistSection> {
               child: Text('Подборки пока не появились'),
             );
           }
-          return Column(
-            children: snapshot.data!.map((p) {
-              final item = CatalogItem.playlist(p);
-              return CatalogTile(
-                item,
-                onTap: () => openCatalog(context, widget.app, item),
-              );
-            }).toList(),
+          return CatalogCarousel(
+            items: snapshot.data!.map(CatalogItem.playlist).toList(),
+            onOpen: (item) => openCatalog(context, widget.app, item),
           );
         },
       ),

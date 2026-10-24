@@ -5,6 +5,7 @@ import '../data/catalog_models.dart';
 import '../data/zvuk_api.dart';
 import '../data/models.dart';
 import 'catalog_widgets.dart';
+import 'catalog_carousel.dart';
 import 'widgets.dart';
 import 'radio_actions.dart';
 import 'download_widgets.dart';
@@ -173,13 +174,14 @@ class _CatalogDetailScreenState extends State<CatalogDetailScreen> {
                                   title: data.item.title,
                                   imageUrl: data.item.imageUrl,
                                 ),
-                                size: 164,
+                                size: (MediaQuery.sizeOf(context).width - 80)
+                                    .clamp(164.0, 280.0),
                               ),
                             ),
                             const SizedBox(height: 20),
                             Text(
                               data.item.title,
-                              style: Theme.of(context).textTheme.headlineSmall,
+                              style: Theme.of(context).textTheme.headlineMedium,
                             ),
                             const SizedBox(height: 6),
                             Text(
@@ -350,12 +352,10 @@ class _CatalogDetailScreenState extends State<CatalogDetailScreen> {
                           ),
                         ),
                       ),
-                      SliverList.builder(
-                        itemCount: data.albums.length,
-                        itemBuilder: (context, index) => CatalogTile(
-                          data.albums[index],
-                          onTap: () =>
-                              openCatalog(context, app, data.albums[index]),
+                      SliverToBoxAdapter(
+                        child: CatalogCarousel(
+                          items: data.albums,
+                          onOpen: (item) => openCatalog(context, app, item),
                         ),
                       ),
                     ],

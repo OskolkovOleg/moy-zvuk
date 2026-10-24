@@ -62,12 +62,12 @@ class CatalogTile extends StatelessWidget {
   Widget build(BuildContext context) => ListTile(
     contentPadding: EdgeInsets.symmetric(
       horizontal: compact ? 12 : 20,
-      vertical: compact ? 0 : 4,
+      vertical: compact ? 0 : 8,
     ),
     horizontalTitleGap: compact ? 10 : null,
     leading: Artwork(
       Track(id: item.id, title: item.title, imageUrl: item.imageUrl),
-      size: compact ? 48 : 52,
+      size: compact ? 48 : 64,
     ),
     title: Text(
       item.title,
