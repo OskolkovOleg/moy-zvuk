@@ -14,6 +14,7 @@ class Track {
     this.releaseId,
     this.genres = const [],
     this.genreSource,
+    this.explicit,
   });
   final String id, title, artists;
   final int duration;
@@ -22,6 +23,8 @@ class Track {
   final List<String> artistNames;
   final List<TrackGenre> genres;
   final GenreSource? genreSource;
+  // null means missing metadata, including caches from older app versions.
+  final bool? explicit;
 
   factory Track.fromApi(Map<String, dynamic> json) {
     final ownGenres = TrackGenre.listFromJson(json['genres']);
@@ -29,6 +32,7 @@ class Track {
     final genres = ownGenres.isNotEmpty ? ownGenres : releaseGenres;
     return Track(
       id: json['id'].toString(),
+      explicit: json['explicit'] is bool ? json['explicit'] as bool : null,
       title: json['title'] as String? ?? 'Недоступный трек',
       artists: (json['artists'] as List? ?? [])
           .map((a) => a['title'] ?? '')
@@ -55,6 +59,7 @@ class Track {
 
   factory Track.fromJson(Map<String, dynamic> json) => Track(
     id: json['id'] as String,
+    explicit: json['explicit'] is bool ? json['explicit'] as bool : null,
     title: json['title'] as String,
     artists: json['artists'] as String? ?? '',
     duration: json['duration'] as int? ?? 0,
@@ -78,6 +83,7 @@ class Track {
     'artistNames': artistNames,
     'genres': genres.map((g) => g.toJson()).toList(),
     'genreSource': genreSource?.name,
+    'explicit': explicit,
   };
 }
 

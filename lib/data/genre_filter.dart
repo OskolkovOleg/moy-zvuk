@@ -173,11 +173,13 @@ List<Track> filterTracksByGenreAndScore(
   Set<GenreGroup> groups = const {},
   int? minScore,
   int? maxScore,
+  bool censoredOnly = false,
 }) {
   if (minScore != null && maxScore != null && minScore > maxScore) {
     throw ArgumentError('Начало диапазона больше конца');
   }
   return source.where((track) {
+    if (censoredOnly && track.explicit != false) return false;
     final score = trackScore(track.id, ratings);
     if ((minScore != null && score < minScore) ||
         (maxScore != null && score > maxScore)) {

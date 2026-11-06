@@ -117,6 +117,118 @@ void main() {
       .toList();
 
   testWidgets(
+    'Censored library filter combines with genre and scores and controls both playback actions',
+    (tester) async {
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      const rock = [TrackGenre(id: 'r', name: 'Rock')];
+      const cleanLow = Track(
+        id: 'clean-low',
+        title: 'Рок — 10',
+        genres: rock,
+        explicit: false,
+      );
+      const cleanHigh = Track(
+        id: 'clean-high',
+        title: 'Рок — 13',
+        genres: rock,
+        explicit: false,
+      );
+      const dirty = Track(
+        id: 'dirty',
+        title: 'Трек с E',
+        genres: rock,
+        explicit: true,
+      );
+      const unknown = Track(
+        id: 'old',
+        title: 'Неизвестная метка',
+        genres: rock,
+      );
+      const pop = Track(
+        id: 'pop',
+        title: 'Поп — 11',
+        genres: [TrackGenre(id: 'p', name: 'Pop')],
+        explicit: false,
+      );
+      for (final (width, scale, suffix) in [
+        (360.0, 1.0, 'normal'),
+        (320.0, 1.6, 'large'),
+      ]) {
+        tester.view.physicalSize = Size(width, 720);
+        tester.view.devicePixelRatio = 1;
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        app.tracks = [cleanLow, dirty, pop, unknown, cleanHigh];
+        app.ratings = {
+          'clean-low': const Rating(10, 1),
+          'dirty': const Rating(12, 3),
+          'old': const Rating(12, 3),
+          'pop': const Rating(11, 2),
+          'clean-high': const Rating(13, 4),
+        };
+        app.setLibraryFilter(LibraryFilter.all);
+        await tester.pumpWidget(
+          RepaintBoundary(key: captureKey, child: ZvukApp(app)),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('library-filter')));
+        await tester.pumpAndSettle();
+        final censored = find.byKey(const Key('filter-censored-only'));
+        await tester.tap(censored);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('censored-metadata-missing')),
+          findsOneWidget,
+        );
+        expect(find.text('Подходит 3 трека'), findsOneWidget);
+        tester
+            .widget<RangeSlider>(find.byKey(const Key('shuffle-score-slider')))
+            .onChanged!(const RangeValues(10, 13));
+        await tester.pumpAndSettle();
+        final rockChip = find.byKey(const ValueKey('shuffle-genre-rock'));
+        await tester.ensureVisible(rockChip);
+        await tester.tap(rockChip);
+        await tester.pumpAndSettle();
+        expect(find.text('Подходит 2 трека'), findsOneWidget);
+        await tester.ensureVisible(censored);
+        await captureUi(tester, 'censored-filter-sheet-$suffix');
+        await tester.tap(find.byKey(const Key('apply-library-filter')));
+        await tester.pumpAndSettle();
+        expect(app.libraryFilter.censoredOnly, true);
+        expect(rows(tester), ['clean-high', 'clean-low']);
+        await captureUi(tester, 'censored-library-$suffix');
+        await tester.tap(find.byKey(const Key('play-from-top')));
+        await tester.pumpAndSettle();
+        expect(music.played.map((t) => t.id), ['clean-high', 'clean-low']);
+        await tester.tap(find.byKey(const Key('shuffle-list')));
+        await tester.pumpAndSettle();
+        expect(music.played.map((t) => t.id).toSet(), {
+          'clean-low',
+          'clean-high',
+        });
+        expect(music.lastTitle, 'Мои песни · Цензурные · Рок · 10–13 баллов');
+        final queue = music.played.map((t) => t.id).toList();
+        await tester.tap(find.byKey(const Key('library-filter')));
+        await tester.pumpAndSettle();
+        expect(tester.widget<FilterChip>(censored).selected, true);
+        await tester.tap(find.byKey(const Key('reset-filter-draft')));
+        await tester.pumpAndSettle();
+        expect(tester.widget<FilterChip>(censored).selected, false);
+        Navigator.of(tester.element(find.byType(ShuffleSheet))).pop();
+        await tester.pumpAndSettle();
+        expect(app.libraryFilter.censoredOnly, true);
+        await tester.tap(find.byKey(const Key('clear-library-filter')));
+        await tester.pumpAndSettle();
+        expect(app.visibleTracks, hasLength(5));
+        expect(music.played.map((t) => t.id), queue);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      }
+    },
+  );
+
+  testWidgets(
     'Library applies rock and score filters; both play actions use that exact result',
     (tester) async {
       addTearDown(tester.view.resetPhysicalSize);

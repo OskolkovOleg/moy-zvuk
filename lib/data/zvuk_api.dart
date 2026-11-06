@@ -43,7 +43,7 @@ class ZvukApi {
   final Duration streamTimeout;
   final Map<String, Cookie> _cookies = {};
   static const _fields =
-      'id title duration genres { id name shortName } '
+      'id title duration explicit genres { id name shortName } '
       'artists { id title } '
       'release { id image { src } genres { id name shortName } }';
   void close() => _client.close();

@@ -67,7 +67,7 @@ class LibraryFilterControl extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        filter.isActive ? label : 'Жанры и баллы',
+                        filter.isActive ? label : 'Фильтры библиотеки',
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(

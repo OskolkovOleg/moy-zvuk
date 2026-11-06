@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../app_controller.dart';
 import '../data/models.dart';
-import '../data/genre_filter.dart';
 import '../downloads/download_record.dart';
 import '../playback/shuffle_tracks.dart';
 import 'catalog_widgets.dart';
@@ -58,7 +57,9 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     final known = {for (final track in app.favoriteTracks) track.id: track};
     final snapshot = [
       for (final track in tracks)
-        track.genres.isEmpty ? known[track.id] ?? track : track,
+        track.genres.isEmpty || track.explicit == null
+            ? known[track.id] ?? track
+            : track,
     ];
     final selection = await showModalBottomSheet<ShuffleSelection>(
       context: context,
@@ -69,7 +70,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     );
     if (selection == null || account != app.account?.id) return;
     final selected = shuffledTracks(
-      filterTracksByGenreAndScore(snapshot, ratings, groups: selection.genres),
+      snapshot.where((t) => selection.filter.matches(t, ratings)).toList(),
       ratings,
       minScore: selection.scores.min,
       maxScore: selection.scores.max,

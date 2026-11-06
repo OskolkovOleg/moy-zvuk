@@ -11,6 +11,57 @@ import 'ui_capture.dart';
 void main() {
   setUpAll(loadUiFonts);
   testWidgets(
+    'Downloaded shuffle returns the censored selection and excludes unknown metadata',
+    (tester) async {
+      const tracks = [
+        Track(id: 'clean', title: 'Clean', explicit: false),
+        Track(id: 'dirty', title: 'Dirty', explicit: true),
+        Track(id: 'old', title: 'Old cache'),
+      ];
+      ShuffleSelection? result;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: appTheme(),
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: FilledButton(
+                onPressed: () async {
+                  result = await showModalBottomSheet<ShuffleSelection>(
+                    context: context,
+                    isScrollControlled: true,
+                    showDragHandle: true,
+                    builder: (_) => const ShuffleSheet(
+                      tracks: tracks,
+                      ratings: {},
+                      title: 'Скачанное',
+                    ),
+                  );
+                },
+                child: const Text('Открыть'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('Открыть'));
+      await tester.pumpAndSettle();
+      expect(find.text('Подходит 3 трека'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('filter-censored-only')));
+      await tester.pumpAndSettle();
+      expect(find.text('Подходит 1 трек'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('start-shuffle')));
+      await tester.pumpAndSettle();
+      expect(result!.filter.censoredOnly, true);
+      expect(result!.titleFor('Скачанное'), 'Скачанное · Цензурные');
+      expect(
+        tracks.where((t) => result!.filter.matches(t, {})).map((t) => t.id),
+        ['clean'],
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'Genre choices combine with scores and keep the play action visible',
     (tester) async {
       tester.view.physicalSize = const Size(320, 640);

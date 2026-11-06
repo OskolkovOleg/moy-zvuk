@@ -12,19 +12,24 @@ class ShuffleSelection {
     this.scores,
     Set<GenreGroup> genres, {
     this.limitScores = true,
+    this.censoredOnly = false,
   }) : genres = Set.unmodifiable(genres);
   final ScoreRange scores;
   final Set<GenreGroup> genres;
   final bool limitScores;
+  final bool censoredOnly;
   LibraryFilter get filter => LibraryFilter(
     minScore: limitScores ? scores.min : null,
     maxScore: limitScores ? scores.max : null,
     genres: genres,
+    censoredOnly: censoredOnly,
   );
 
-  String titleFor(String title) => genres.isEmpty
-      ? title
-      : '$title · ${genres.map((g) => g.label).join(', ')}';
+  String titleFor(String title) => [
+    title,
+    if (censoredOnly) 'Цензурные',
+    if (genres.isNotEmpty) genres.map((g) => g.label).join(', '),
+  ].join(' · ');
 }
 
 class ShuffleSheet extends StatefulWidget {
@@ -49,6 +54,7 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
   late final int lowest, highest;
   late final int actualLowest, actualHighest;
   late bool limitScores;
+  late bool censoredOnly;
   late ScoreRange range;
   final selectedGenres = <GenreGroup>{};
   late final Set<GenreGroup> availableGenres;
@@ -63,6 +69,7 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
         ? initialTrackScore
         : scores.reduce(math.max);
     final initial = widget.initialFilter;
+    censoredOnly = initial.censoredOnly;
     lowest = [
       actualLowest,
       initial.minScore ?? actualLowest,
@@ -84,13 +91,19 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
 
   void reset() => setState(() {
     selectedGenres.clear();
+    censoredOnly = false;
     range = ScoreRange(actualLowest, actualHighest);
     limitScores = !widget.libraryMode;
   });
 
   void submit(BuildContext context) => Navigator.pop(
     context,
-    ShuffleSelection(range, selectedGenres, limitScores: limitScores),
+    ShuffleSelection(
+      range,
+      selectedGenres,
+      limitScores: limitScores,
+      censoredOnly: censoredOnly,
+    ),
   );
 
   @override
@@ -100,9 +113,11 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
       widget.tracks,
       widget.ratings,
       groups: selectedGenres,
+      censoredOnly: censoredOnly,
       minScore: limitScores ? range.min : null,
       maxScore: limitScores ? range.max : null,
     ).length;
+    final unknownCount = widget.tracks.where((t) => t.explicit == null).length;
     Widget bound(String title, int value, Key key) => Expanded(
       child: Column(
         crossAxisAlignment: title == 'От'
@@ -171,6 +186,38 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const SizedBox(height: 8),
+                    Text(
+                      'Содержание',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    FilterChip(
+                      key: const Key('filter-censored-only'),
+                      label: const Text('Цензурные'),
+                      selected: censoredOnly,
+                      onSelected: (value) =>
+                          setState(() => censoredOnly = value),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Треки без метки E в Звуке.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    if (censoredOnly && unknownCount > 0) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Без данных: ${trackCountLabel(unknownCount)}. Они скрыты; обнови библиотеку, чтобы проверить их.',
+                        key: const Key('censored-metadata-missing'),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 24),
                     Text(
                       'Диапазон баллов',
                       style: Theme.of(context).textTheme.titleMedium,
@@ -268,7 +315,7 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
                 children: [
                   Text(
                     matches == 0
-                        ? selectedGenres.isEmpty
+                        ? selectedGenres.isEmpty && !censoredOnly
                               ? 'В этом диапазоне нет песен'
                               : 'Нет песен с такими параметрами'
                         : 'Подходит ${trackCountLabel(matches)}',

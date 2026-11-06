@@ -33,6 +33,7 @@ void main() {
       final old = (await store.loadTracks('owner', 'old')).single;
       expect(old.genres, isEmpty);
       expect(old.genreSource, isNull);
+      expect(old.explicit, isNull);
       expect(trackScore(old.id, await store.ratings('owner')), 9);
     },
   );
@@ -41,6 +42,7 @@ void main() {
     final fromTrack = Track.fromApi({
       'id': 'track',
       'title': 'Crossover',
+      'explicit': false,
       'genres': [
         {'id': '43', 'name': 'Pop'},
         {'id': '39', 'name': 'Hip-Hop'},
@@ -49,6 +51,7 @@ void main() {
     final fromRelease = Track.fromApi({
       'id': 'release',
       'title': 'Release fallback',
+      'explicit': true,
       'release': {
         'genres': [
           {'id': '23', 'name': 'Rock'},
@@ -66,6 +69,7 @@ void main() {
       fromTrack.toJson(),
     ]);
     expect(cached.first.genreSource, GenreSource.release);
+    expect(cached.map((t) => t.explicit), [true, false]);
     final favorites = await store.loadTracks('owner', 'favorites');
     expect(favorites.single.toJson(), fromTrack.toJson());
     final pending = await store.pendingFavoriteAdds('owner');
@@ -95,6 +99,7 @@ void main() {
       final fresh = Track.fromApi({
         'id': 'track',
         'title': 'Fresh metadata',
+        'explicit': false,
         'genres': [
           {'id': 'future', 'name': 'Future Unmapped Genre'},
         ],
@@ -102,6 +107,7 @@ void main() {
       await store.mergeFavorites('owner', [fresh]);
       final cached = (await store.loadTracks('owner', 'favorites')).single;
       expect(cached.genres.single.name, 'Future Unmapped Genre');
+      expect(cached.explicit, false);
       expect(cached.genreSource, GenreSource.track);
       expect(genreGroupsFor(cached), isEmpty);
       expect(trackScore(cached.id, await store.ratings('owner')), 9);
