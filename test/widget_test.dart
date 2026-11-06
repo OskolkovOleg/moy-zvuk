@@ -46,6 +46,7 @@ void main() {
       await tester.tap(find.text('Открыть'));
       await tester.pumpAndSettle();
       expect(find.text('Подходит 3 трека'), findsOneWidget);
+      await tester.ensureVisible(find.byKey(const Key('filter-censored-only')));
       await tester.tap(find.byKey(const Key('filter-censored-only')));
       await tester.pumpAndSettle();
       expect(find.text('Подходит 1 трек'), findsOneWidget);

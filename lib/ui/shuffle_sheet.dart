@@ -187,38 +187,6 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
                   children: [
                     const SizedBox(height: 8),
                     Text(
-                      'Содержание',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    FilterChip(
-                      key: const Key('filter-censored-only'),
-                      label: const Text('Цензурные'),
-                      selected: censoredOnly,
-                      onSelected: (value) =>
-                          setState(() => censoredOnly = value),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Треки без метки E в Звуке.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                    if (censoredOnly && unknownCount > 0) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        'Временно скрыто: ${trackCountLabel(unknownCount)} без данных о метке. Обнови библиотеку.',
-                        key: const Key('censored-metadata-missing'),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 24),
-                    Text(
                       'Диапазон баллов',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
@@ -302,6 +270,38 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
                               ),
                           ],
                         ),
+                    ],
+                    const SizedBox(height: 24),
+                    Text(
+                      'Содержание',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    FilterChip(
+                      key: const Key('filter-censored-only'),
+                      label: const Text('Цензурные'),
+                      selected: censoredOnly,
+                      onSelected: (value) =>
+                          setState(() => censoredOnly = value),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Треки без метки E в Звуке.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    if (censoredOnly && unknownCount > 0) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Временно скрыто: ${trackCountLabel(unknownCount)} без данных о метке. Обнови библиотеку.',
+                        key: const Key('censored-metadata-missing'),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
                     ],
                   ],
                 ),

@@ -175,6 +175,7 @@ void main() {
         await tester.tap(find.byKey(const Key('library-filter')));
         await tester.pumpAndSettle();
         final censored = find.byKey(const Key('filter-censored-only'));
+        await tester.ensureVisible(censored);
         await tester.tap(censored);
         await tester.pumpAndSettle();
         expect(
