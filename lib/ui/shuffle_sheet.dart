@@ -209,7 +209,7 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
                     if (censoredOnly && unknownCount > 0) ...[
                       const SizedBox(height: 8),
                       Text(
-                        'Без данных: ${trackCountLabel(unknownCount)}. Они скрыты; обнови библиотеку, чтобы проверить их.',
+                        'Временно скрыто: ${trackCountLabel(unknownCount)} без данных о метке. Обнови библиотеку.',
                         key: const Key('censored-metadata-missing'),
                         style: TextStyle(
                           fontSize: 12,
