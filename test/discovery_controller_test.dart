@@ -213,4 +213,31 @@ void main() {
     await c.memory.restore('owner', t);
     expect((await c.memory.load('owner')).hidden, isEmpty);
   });
+  test(
+    'Account switch during a request clears old results and stops loading',
+    () async {
+      final delayed = Completer<http.Response>();
+      app.api = ZvukApi('fixture', client: MockClient((_) => delayed.future));
+      final c = controller(
+        DiscoveryMode.song,
+        seed: const Track(id: 'old', title: 'Old'),
+      );
+      final pending = c.load();
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      app.account = const Account('other', 'Other');
+      delayed.complete(
+        reply({
+          'recommenderRadio': {
+            'tracks': [row('private')],
+            'cursor': 50,
+          },
+        }),
+      );
+      await pending;
+      expect(c.candidates, isEmpty);
+      expect(c.loading, false);
+      expect(c.error, contains('Подключение изменилось'));
+      expect((await c.memory.load('other')).offered, isEmpty);
+    },
+  );
 }

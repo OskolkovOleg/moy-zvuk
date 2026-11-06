@@ -43,6 +43,7 @@ class DiscoveryController extends ChangeNotifier {
   Future<void> load({bool resetRecent = false}) async {
     final request = ++_request, api = app.api, account = app.account?.id;
     if (api == null || account == null) {
+      candidates = [];
       error = 'Для поиска новой музыки обнови подключение в настройках.';
       loading = false;
       _notify();
@@ -69,6 +70,7 @@ class DiscoveryController extends ChangeNotifier {
       if (!current()) return;
       final cursors = Map<String, int>.of(state.cursors);
       final failures = <String>[];
+      Object? firstFailure;
       var successful = 0;
       Future<List<DiscoveryCandidate>> source(
         String name,
@@ -78,7 +80,8 @@ class DiscoveryController extends ChangeNotifier {
           final rows = await fetch();
           successful++;
           return rows;
-        } catch (_) {
+        } catch (e) {
+          firstFailure ??= e;
           failures.add(name);
           return [];
         }
@@ -138,7 +141,7 @@ class DiscoveryController extends ChangeNotifier {
               offset: state.cycle * 5,
               limit: 12,
             ).expand((t) => t.artistIds),
-          }.take(12).toList();
+          }.toList();
           if (artists.isEmpty) {
             throw const ZvukException(
               'Добавь любимых артистов или песни в библиотеку — здесь появятся их новинки.',
@@ -146,7 +149,12 @@ class DiscoveryController extends ChangeNotifier {
           }
           pools = [
             await source('Новинки артистов', () async {
-              final albums = await api.discoveryReleases(artists);
+              final offset = state.cycle * 12 % artists.length;
+              final batch = [
+                ...artists.skip(offset),
+                ...artists.take(offset),
+              ].take(12).toList();
+              final albums = await api.discoveryReleases(batch);
               return [
                 for (final release in albums)
                   if (isRecentRelease(release.date, _now()))
@@ -169,6 +177,7 @@ class DiscoveryController extends ChangeNotifier {
                     .firstWhere((d) => d.id == selectedDirection)
                     .playlistIds;
           final lists = await api.getPlaylists(ids);
+          if (lists.length < ids.length) failures.add('Недоступная подборка');
           if (!current()) return;
           pools = await Future.wait(
             lists.map(
@@ -189,6 +198,7 @@ class DiscoveryController extends ChangeNotifier {
       }
       if (!current()) return;
       if (successful == 0) {
+        if (firstFailure is ZvukException) throw firstFailure!;
         throw const ZvukException(
           'Источники музыки сейчас недоступны. Попробуй ещё раз.',
         );
@@ -223,8 +233,12 @@ class DiscoveryController extends ChangeNotifier {
         candidates = [];
       }
     } finally {
-      if (current()) {
+      if (!_disposed && request == _request) {
         loading = false;
+        if (!current()) {
+          candidates = [];
+          error = 'Подключение изменилось. Открой подборку заново.';
+        }
         _notify();
       }
     }

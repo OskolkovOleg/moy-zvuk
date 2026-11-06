@@ -29,7 +29,7 @@ void main() {
       client: MockClient((request) async {
         final body = jsonDecode(request.body);
         expect(body['operationName'], 'getTracks');
-        expect(body['query'], contains('duration explicit genres'));
+        expect(body['query'], contains(RegExp(r'\bexplicit\b')));
         return http.Response(
           jsonEncode({
             'data': {

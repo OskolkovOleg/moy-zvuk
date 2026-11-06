@@ -38,6 +38,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
             widget.app.favoriteTracks.firstOrNull,
       );
   bool acting = false;
+  late final _account = widget.app.account?.id;
+  bool get sameAccount => widget.app.account?.id == _account;
   @override
   void initState() {
     super.initState();
@@ -54,7 +56,9 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       controller.candidates.map((c) => c.track).toList();
 
   Future<void> playback(String action, {int index = 0}) async {
-    if (acting || controller.loading || snapshot.isEmpty) return;
+    if (!sameAccount || acting || controller.loading || snapshot.isEmpty) {
+      return;
+    }
     final tracks = snapshot;
     setState(() => acting = true);
     try {
@@ -85,6 +89,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   }
 
   Future<void> chooseSeed() async {
+    if (!sameAccount) return;
     final track = await showModalBottomSheet<Track>(
       context: context,
       isScrollControlled: true,
@@ -97,6 +102,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   }
 
   Future<void> options() async {
+    if (!sameAccount) return;
     final action = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -189,6 +195,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   }
 
   Future<void> songActions(Track track) async {
+    if (!sameAccount) return;
     final action = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -238,8 +245,16 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       ),
     ],
     body: AnimatedBuilder(
-      animation: controller,
+      animation: Listenable.merge([controller, widget.app]),
       builder: (context, _) {
+        if (!sameAccount) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Text('Аккаунт изменился. Открой подборку заново.'),
+            ),
+          );
+        }
         final scheme = Theme.of(context).colorScheme;
         return RefreshIndicator(
           onRefresh: controller.load,
@@ -343,7 +358,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                           controller.candidates.isNotEmpty) ...[
                         const SizedBox(height: 16),
                         Text(
-                          '${trackCountLabel(controller.candidates.length)} вне библиотеки',
+                          trackCountLabel(controller.candidates.length),
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                         const SizedBox(height: 12),
@@ -423,7 +438,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'Подходящие песни уже в библиотеке или предлагались недавно. Можно выбрать другое направление или повторить предложения.',
+                          'Попробуй другую песню или направление, отключи фильтр «Цензурные» или повтори недавние предложения.',
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 16),
