@@ -9,6 +9,7 @@ import 'catalog_carousel.dart';
 import 'radio_actions.dart';
 import '../data/wave_source.dart';
 import 'wave_settings.dart';
+import 'discovery_entry.dart';
 
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen(this.app, {super.key});
@@ -33,6 +34,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final scheme = Theme.of(context).colorScheme;
     return ListView(
       children: [
+        DiscoveryEntries(widget.app),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           child: Material(

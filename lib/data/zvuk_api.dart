@@ -11,11 +11,13 @@ import 'personal_models.dart';
 import 'wave_source.dart';
 import 'search_models.dart';
 import 'wave_options.dart';
+import 'discovery_models.dart';
 
 part 'catalog_api.dart';
 part 'personal_api.dart';
 part 'radio_api.dart';
 part 'search_api.dart';
+part 'discovery_api.dart';
 
 class ZvukException implements Exception {
   const ZvukException(
@@ -43,7 +45,7 @@ class ZvukApi {
   final Duration streamTimeout;
   final Map<String, Cookie> _cookies = {};
   static const _fields =
-      'id title duration explicit genres { id name shortName } '
+      'id title duration explicit canonicalTrackId genres { id name shortName } '
       'artists { id title } '
       'release { id image { src } genres { id name shortName } }';
   void close() => _client.close();

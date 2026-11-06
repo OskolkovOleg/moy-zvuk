@@ -9,6 +9,7 @@ import '../data/library_store.dart';
 import '../data/audio_preferences.dart';
 import '../data/history_store.dart';
 import '../data/models.dart';
+import '../data/discovery_models.dart';
 import '../data/zvuk_api.dart';
 import '../data/wave_source.dart';
 import '../data/wave_options.dart';
@@ -493,6 +494,24 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     _restoredPosition = Duration.zero;
     _publishQueue();
     await _loadAndPlay();
+  }
+
+  Future<int> appendDiscoveries(List<Track> tracks) async {
+    final seen = playlist.tracks.expand(discoveryIdentity).toSet();
+    var count = 0;
+    for (final track in tracks) {
+      final keys = discoveryIdentity(track);
+      if (keys.any(seen.contains)) continue;
+      seen.addAll(keys);
+      playlist.enqueue(track);
+      count++;
+    }
+    if (count > 0) {
+      _publishQueue();
+      _broadcast();
+      await _saveSafely();
+    }
+    return count;
   }
 
   Future<void> enqueueTrack(Track track, {bool next = false}) async {

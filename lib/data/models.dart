@@ -15,10 +15,11 @@ class Track {
     this.genres = const [],
     this.genreSource,
     this.explicit,
+    this.canonicalTrackId,
   });
   final String id, title, artists;
   final int duration;
-  final String? imageUrl, releaseId;
+  final String? imageUrl, releaseId, canonicalTrackId;
   final List<String> artistIds;
   final List<String> artistNames;
   final List<TrackGenre> genres;
@@ -32,6 +33,7 @@ class Track {
     final genres = ownGenres.isNotEmpty ? ownGenres : releaseGenres;
     return Track(
       id: json['id'].toString(),
+      canonicalTrackId: json['canonicalTrackId']?.toString(),
       explicit: json['explicit'] is bool ? json['explicit'] as bool : null,
       title: json['title'] as String? ?? 'Недоступный трек',
       artists: (json['artists'] as List? ?? [])
@@ -59,6 +61,7 @@ class Track {
 
   factory Track.fromJson(Map<String, dynamic> json) => Track(
     id: json['id'] as String,
+    canonicalTrackId: json['canonicalTrackId']?.toString(),
     explicit: json['explicit'] is bool ? json['explicit'] as bool : null,
     title: json['title'] as String,
     artists: json['artists'] as String? ?? '',
@@ -84,6 +87,7 @@ class Track {
     'genres': genres.map((g) => g.toJson()).toList(),
     'genreSource': genreSource?.name,
     'explicit': explicit,
+    'canonicalTrackId': canonicalTrackId,
   };
 }
 

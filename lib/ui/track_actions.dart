@@ -11,6 +11,8 @@ import 'radio_actions.dart';
 import '../data/wave_source.dart';
 import '../downloads/download_record.dart';
 import 'download_widgets.dart';
+import 'discovery_entry.dart';
+import '../data/discovery_models.dart';
 
 Future<void> openTrackActions(
   BuildContext context,
@@ -51,6 +53,7 @@ Future<void> openTrackActions(
               ('next', Icons.playlist_play_rounded, 'Следующим'),
               ('last', Icons.playlist_add_rounded, 'В конец очереди'),
               ('radio', Icons.sensors_rounded, 'Поток по песне'),
+              ('discover', Icons.explore_outlined, 'Открытия по этой песне'),
               (
                 'similar',
                 Icons.auto_awesome_rounded,
@@ -89,6 +92,8 @@ Future<void> openTrackActions(
         } else {
           if (context.mounted) await downloadTracks(context, app, [track]);
         }
+      case 'discover':
+        await openDiscoveries(context, app, DiscoveryMode.song, seed: track);
       case 'radio':
       case 'similar':
         await openRadioAction(
