@@ -305,7 +305,21 @@ void main() {
         expect(rows(tester), ['high', 'low']);
         await tester.tap(find.byKey(const Key('clear-library-filter')));
         await tester.pumpAndSettle();
-        expect(rows(tester), ['high', 'pop', 'low', 'middle']);
+        expect(app.visibleTracks.map((t) => t.id), [
+          'high',
+          'pop',
+          'low',
+          'middle',
+        ]);
+        // The longer filter heading can push the last row outside a narrow
+        // viewport. Verify the restored row by scrolling, not by assuming
+        // that a lazy list has built every item above the fold.
+        await tester.drag(
+          find.byType(CustomScrollView).first,
+          const Offset(0, -160),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text(middle.title).hitTestable(), findsOneWidget);
         expect(app.libraryFilter, LibraryFilter.all);
         expect(music.played.map((t) => t.id), queue);
         expect(tester.takeException(), isNull);
