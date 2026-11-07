@@ -1,14 +1,12 @@
 import 'dart:io';
-import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:zvuk_personal/app_controller.dart';
-import 'package:zvuk_personal/data/history_store.dart';
 import 'package:zvuk_personal/data/library_store.dart';
 import 'package:zvuk_personal/data/library_filter.dart';
 import 'package:zvuk_personal/data/listening_stats.dart';
+import 'package:zvuk_personal/data/listening_stats_store.dart';
 import 'package:zvuk_personal/data/models.dart';
 import 'package:zvuk_personal/downloads/download_manager.dart';
 import 'package:zvuk_personal/playback/music_handler.dart';
@@ -18,6 +16,20 @@ import 'package:zvuk_personal/ui/theme.dart';
 import 'package:zvuk_personal/ui/widgets.dart';
 
 import 'ui_capture.dart';
+
+class _Store implements LibraryStore {
+  @override
+  dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
+}
+
+class _Stats implements ListeningStatsStore {
+  _Stats(this.stats);
+  final ListeningStats stats;
+  @override
+  Future<ListeningStats> load(String account, {DateTime? now}) async => stats;
+  @override
+  dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
+}
 
 class _Music implements MusicHandler {
   _Music(LibraryStore store)
@@ -49,24 +61,28 @@ class _Music implements MusicHandler {
 
 void main() {
   setUpAll(() async {
-    sqfliteFfiInit();
     await loadUiFonts();
   });
   late LibraryStore store;
-  late Directory dir;
   late AppController app;
   late _Music music;
   const a = Track(id: 'a', title: 'Часто слушаю', artists: 'Первый'),
       b = Track(id: 'b', title: 'Один запуск', artists: 'Второй'),
       c = Track(id: 'c', title: 'Без запусков за неделю', artists: 'Третий');
   setUp(() async {
-    dir = await Directory.systemTemp.createTemp('library-sort-ui');
-    store = await LibraryStore.open(
-      factory: databaseFactoryFfi,
-      databasePath: '${dir.path}/test.db',
+    store = _Store();
+    final now = DateTime.now();
+    final stats = ListeningStats(
+      now.subtract(const Duration(days: 2)),
+      last: {'a': now.subtract(const Duration(days: 1)), 'b': now},
+      starts: [
+        ListeningStart('a1', 'a', now.subtract(const Duration(days: 2))),
+        ListeningStart('a2', 'a', now.subtract(const Duration(days: 1))),
+        ListeningStart('b', 'b', now),
+      ],
     );
     music = _Music(store);
-    app = AppController(store, music)
+    app = AppController(store, music, historyStatsStore: _Stats(stats))
       ..account = const Account('owner', 'Fixture')
       ..tracks = [a, b, c]
       ..favoriteTracks = [a, b, c]
@@ -75,19 +91,12 @@ void main() {
         'b': const Rating(12, 3),
         'c': const Rating(10, 1),
       };
-    await store.saveTracks('owner', 'favorites', [a, b, c]);
-    final history = HistoryStore(store), now = DateTime.now();
-    await history.record('owner', a, now.subtract(const Duration(days: 2)));
-    await history.record('owner', a, now.subtract(const Duration(days: 1)));
-    await history.record('owner', b, now);
   });
   tearDown(() async {
     app.dispose();
     music.downloads.dispose();
     music.error.dispose();
     music.revision.dispose();
-    await store.close();
-    await dir.delete(recursive: true);
   });
   Future<void> show(WidgetTester tester) async {
     await tester.pumpWidget(
@@ -128,22 +137,7 @@ void main() {
         expect(find.text(value.label), findsOneWidget);
       }
       await captureUi(tester, 'library-sort-menu-360');
-      final changed = Completer<void>();
-      void selected() {
-        if (app.librarySort == LibrarySort.leastPlayed &&
-            app.listeningStats != null &&
-            !app.libraryHistoryLoading &&
-            !changed.isCompleted) {
-          changed.complete();
-        }
-      }
-
-      app.addListener(selected);
-      await tester.runAsync(() async {
-        await tester.tap(find.byKey(const ValueKey('sort-leastPlayed')));
-        await changed.future.timeout(const Duration(seconds: 10));
-      });
-      app.removeListener(selected);
+      await tester.tap(find.byKey(const ValueKey('sort-leastPlayed')));
       await tester.pumpAndSettle();
       expect(app.visibleTracks.map((t) => t.id), ['c', 'b', 'a']);
       await captureUi(tester, 'library-weekly-sort-360');

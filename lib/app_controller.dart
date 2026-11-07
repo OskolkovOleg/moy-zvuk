@@ -20,7 +20,12 @@ part 'score_library_controller.dart';
 part 'library_listening_controller.dart';
 
 class AppController extends ChangeNotifier {
-  AppController(this.store, this.music, {this.tokens = const TokenStore()}) {
+  AppController(
+    this.store,
+    this.music, {
+    this.tokens = const TokenStore(),
+    ListeningStatsStore? historyStatsStore,
+  }) : historyStatsStore = historyStatsStore ?? ListeningStatsStore(store) {
     music.onNotificationVote = _voteFromNotification;
   }
 
@@ -49,6 +54,7 @@ class AppController extends ChangeNotifier {
   }
 
   final LibraryStore store;
+  final ListeningStatsStore historyStatsStore;
   final MusicHandler music;
   final TokenStore tokens;
   Account? account;

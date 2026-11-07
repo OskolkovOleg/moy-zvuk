@@ -48,7 +48,7 @@ extension LibraryListening on AppController {
     libraryHistoryError = null;
     notifyListeners();
     try {
-      final statsStore = ListeningStatsStore(store);
+      final statsStore = historyStatsStore;
       var stats = await statsStore.load(id);
       if (!current()) return;
       _listeningStats = stats;
@@ -59,7 +59,7 @@ extension LibraryListening on AppController {
           for (var page = 0; page < 4 && offset != null; page++) {
             final result = await session.listeningHistory(
               offset: offset,
-              limit: 50,
+              limit: 250,
             );
             if (!current() || api != session) return;
             entries.addAll(result.entries);
