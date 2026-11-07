@@ -133,8 +133,9 @@ void main() {
         if (app.librarySort == LibrarySort.leastPlayed &&
             app.listeningStats != null &&
             !app.libraryHistoryLoading &&
-            !changed.isCompleted)
+            !changed.isCompleted) {
           changed.complete();
+        }
       }
 
       app.addListener(selected);
