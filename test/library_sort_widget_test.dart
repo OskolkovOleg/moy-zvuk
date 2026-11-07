@@ -100,12 +100,12 @@ void main() {
   });
   Future<void> show(WidgetTester tester) async {
     await tester.pumpWidget(
-      MaterialApp(
-        theme: appTheme(),
-        home: Scaffold(
-          body: RepaintBoundary(
-            key: captureKey,
-            child: AnimatedBuilder(
+      RepaintBoundary(
+        key: captureKey,
+        child: MaterialApp(
+          theme: appTheme(),
+          home: Scaffold(
+            body: AnimatedBuilder(
               animation: app,
               builder: (_, _) => LibraryScreen(app),
             ),
