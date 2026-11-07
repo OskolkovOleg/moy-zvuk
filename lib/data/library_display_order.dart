@@ -2,12 +2,14 @@ import 'dart:collection';
 
 import 'models.dart';
 import 'library_filter.dart';
+import 'listening_stats.dart';
 
 /// Keeps rows in place while scores change during a library visit.
 class LibraryDisplayOrder {
   String? _account, _list;
   List<String>? _ids;
   LibraryFilter? _filter;
+  LibrarySort? _sort;
   final _eligible = <String, bool>{};
 
   void reset() {
@@ -21,11 +23,20 @@ class LibraryDisplayOrder {
     List<Track> tracks,
     Map<String, Rating> ratings, {
     LibraryFilter filter = LibraryFilter.all,
+    LibrarySort sort = LibrarySort.scores,
+    ListeningStats? stats,
+    DateTime? now,
   }) {
-    if (_account != account || _list != list || _filter != filter) reset();
+    if (_account != account ||
+        _list != list ||
+        _filter != filter ||
+        _sort != sort) {
+      reset();
+    }
     _account = account;
     _list = list;
     _filter = filter;
+    _sort = sort;
     if (filter.isActive) {
       final present = tracks.map((t) => t.id).toSet();
       _eligible.removeWhere((id, _) => !present.contains(id));
@@ -55,10 +66,16 @@ class LibraryDisplayOrder {
       }
     }
     visible.addAll(
-      rankedTracks([
-        for (var i = 0; i < tracks.length; i++)
-          if (!used.contains(i)) tracks[i],
-      ], ratings),
+      sortedLibraryTracks(
+        [
+          for (var i = 0; i < tracks.length; i++)
+            if (!used.contains(i)) tracks[i],
+        ],
+        ratings,
+        sort: sort,
+        stats: stats,
+        now: now,
+      ),
     );
     _ids = visible.map((t) => t.id).toList();
     return List.unmodifiable(visible);

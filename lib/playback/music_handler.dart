@@ -8,6 +8,7 @@ import 'package:just_audio/just_audio.dart';
 import '../data/library_store.dart';
 import '../data/audio_preferences.dart';
 import '../data/history_store.dart';
+import '../data/listening_stats_store.dart';
 import '../data/models.dart';
 import '../data/discovery_models.dart';
 import '../data/zvuk_api.dart';
@@ -269,6 +270,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
   String? _account;
   bool _loaded = false, _loading = false, _advancing = false;
   bool _historyRecorded = false;
+  final _listeningOccurrence = ListeningOccurrence();
   Future<void> _historyWrite = Future.value();
 
   void _recordListening() {
@@ -284,8 +286,14 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     }
     _historyRecorded = true;
     final at = DateTime.now();
+    final eventId = _listeningOccurrence.idFor(
+      playlist.entryKey(playlist.index),
+    );
     _historyWrite = _historyWrite
-        .then((_) => HistoryStore(store).record(account, track, at))
+        .then(
+          (_) =>
+              HistoryStore(store).record(account, track, at, eventId: eventId),
+        )
         .catchError((_) {
           // A history write must never interrupt playback.
         });
@@ -350,6 +358,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     _loaded = false;
     _historyRecorded = false;
     playlist.replace([], 0);
+    _listeningOccurrence.reset();
     sourceTitle = 'Очередь';
     isShuffled = false;
     repeatMode = AudioServiceRepeatMode.none;
@@ -534,6 +543,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     if (player.processingState == ProcessingState.completed) {
       final generation = _generation;
       _historyRecorded = false;
+      _listeningOccurrence.reset();
       await player.seek(Duration.zero);
       if (generation != _generation) return;
     }
@@ -629,6 +639,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
           !isWave &&
           playlist.current != null) {
         playlist.jump(0);
+        _listeningOccurrence.reset();
       } else {
         await pause();
         return;
@@ -665,6 +676,7 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
   Future<void> skipToQueueItem(int index) async {
     if (index < 0 || index >= playlist.length) return;
     playlist.jump(index);
+    _listeningOccurrence.reset();
     _restoredPosition = Duration.zero;
     _publishQueue(updateQueue: false);
     await _loadAndPlay();

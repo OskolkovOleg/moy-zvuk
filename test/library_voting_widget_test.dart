@@ -371,7 +371,7 @@ void main() {
       expect(find.text('Нет подходящих песен'), findsOneWidget);
       expect(
         tester
-            .widget<FilledButton>(find.byKey(const Key('play-from-top')))
+            .widget<IconButton>(find.byKey(const Key('play-from-top')))
             .onPressed,
         isNull,
       );

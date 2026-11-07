@@ -5,6 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'data/library_store.dart';
 import 'data/library_display_order.dart';
 import 'data/library_filter.dart';
+import 'data/listening_stats.dart';
+import 'data/listening_stats_store.dart';
+import 'data/personal_models.dart';
 import 'data/models.dart';
 import 'data/catalog_models.dart';
 import 'data/token_store.dart';
@@ -14,6 +17,7 @@ import 'playback/shuffle_tracks.dart';
 
 part 'personal_controller.dart';
 part 'score_library_controller.dart';
+part 'library_listening_controller.dart';
 
 class AppController extends ChangeNotifier {
   AppController(this.store, this.music, {this.tokens = const TokenStore()}) {
@@ -59,6 +63,13 @@ class AppController extends ChangeNotifier {
   final _displayOrder = LibraryDisplayOrder();
   LibraryFilter _libraryFilter = LibraryFilter.all;
   String? _filterAccount, _filterList;
+  LibrarySort _librarySort = LibrarySort.scores;
+  String? _sortAccount, _sortList;
+  ListeningStats? _listeningStats;
+  int _historyRequest = 0;
+  DateTime? _lastHistoryRemote;
+  bool libraryHistoryLoading = false;
+  String? libraryHistoryError;
 
   LibraryFilter get libraryFilter {
     if (_filterAccount != account?.id || _filterList != listId) {
@@ -100,9 +111,11 @@ class AppController extends ChangeNotifier {
     tracks,
     ratings,
     filter: libraryFilter,
+    sort: librarySort,
+    stats: _listeningStats,
   );
 
-  void resortLibrary() {
+  void resortLibrary({bool reloadHistory = true}) {
     _displayOrder.reset();
     // Capture now: a vote may finish before the next UI frame is built.
     _displayOrder.arrange(
@@ -111,8 +124,23 @@ class AppController extends ChangeNotifier {
       tracks,
       ratings,
       filter: libraryFilter,
+      sort: librarySort,
+      stats: _listeningStats,
     );
     notifyListeners();
+    if (reloadHistory &&
+        librarySort != LibrarySort.scores &&
+        !libraryHistoryLoading) {
+      unawaited(
+        refreshLibraryListening(
+          remote:
+              librarySort == LibrarySort.oldest &&
+              (_lastHistoryRemote == null ||
+                  DateTime.now().difference(_lastHistoryRemote!) >
+                      const Duration(minutes: 5)),
+        ),
+      );
+    }
   }
 
   Future<void> playVisible({int index = 0}) async {
@@ -121,9 +149,11 @@ class AppController extends ChangeNotifier {
     await music.playList(snapshot, index, title: libraryPlaybackTitle);
   }
 
-  String get libraryPlaybackTitle => libraryFilter.isActive
-      ? '$listTitle · ${libraryFilter.label}'
-      : listTitle;
+  String get libraryPlaybackTitle => [
+    listTitle,
+    if (libraryFilter.isActive) libraryFilter.label,
+    if (librarySort != LibrarySort.scores) librarySort.label,
+  ].join(' · ');
 
   Future<void> playShuffled({
     int? minScore,
@@ -241,7 +271,12 @@ class AppController extends ChangeNotifier {
   Future<void> refresh() async {
     if (_disposed) return;
     final ratingRevision = _ratingRevision;
-    resortLibrary();
+    resortLibrary(reloadHistory: false);
+    if (librarySort != LibrarySort.scores && !libraryHistoryLoading) {
+      unawaited(
+        refreshLibraryListening(remote: librarySort == LibrarySort.oldest),
+      );
+    }
     if (busy || serverBusy || api == null || account == null) return;
     await syncLibraryAdds();
     if (_disposed || busy || serverBusy || api == null || account == null) {

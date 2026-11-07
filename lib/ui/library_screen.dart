@@ -7,6 +7,8 @@ import 'saved_catalog_screen.dart';
 import 'history_screen.dart';
 import 'widgets.dart';
 import 'library_filter_control.dart';
+import 'library_sort_control.dart';
+import '../data/listening_stats.dart';
 import '../data/library_filter.dart';
 import 'downloads_screen.dart';
 import 'download_widgets.dart';
@@ -135,11 +137,17 @@ class _LibraryScreenState extends State<LibraryScreen> {
       overflow: TextOverflow.ellipsis,
       style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
     );
-    final playButton = FilledButton.icon(
+    final waitingForStats =
+        app.librarySort != LibrarySort.scores &&
+        app.libraryHistoryLoading &&
+        app.listeningStats == null;
+    final playButton = IconButton.filled(
       key: const Key('play-from-top'),
-      onPressed: tracks.isEmpty ? null : () => app.playVisible(),
-      icon: const Icon(Icons.play_arrow_rounded, size: 22),
-      label: const Text('Слушать'),
+      tooltip: 'Слушать список',
+      onPressed: tracks.isEmpty || waitingForStats
+          ? null
+          : () => app.playVisible(),
+      icon: const Icon(Icons.play_arrow_rounded, size: 26),
     );
     return Stack(
       children: [
@@ -266,22 +274,17 @@ class _LibraryScreenState extends State<LibraryScreen> {
                           const SizedBox(height: 8),
                           LibraryFilterControl(app),
                           const SizedBox(height: 16),
-                          if (largeText) ...[
-                            trackCount,
-                            const SizedBox(height: 8),
-                          ],
                           Row(
                             children: [
-                              if (!largeText) Expanded(child: trackCount),
-                              if (largeText)
-                                Expanded(child: playButton)
-                              else
-                                playButton,
+                              Expanded(child: trackCount),
+                              LibrarySortButton(app),
+                              const SizedBox(width: 8),
+                              playButton,
                               const SizedBox(width: 8),
                               IconButton.outlined(
                                 key: const Key('shuffle-list'),
                                 tooltip: 'Перемешать',
-                                onPressed: tracks.isEmpty
+                                onPressed: tracks.isEmpty || waitingForStats
                                     ? null
                                     : () async {
                                         try {
@@ -302,6 +305,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                               ),
                             ],
                           ),
+                          LibrarySortSummary(app),
                           const SizedBox(height: 12),
                         ],
                       ),
