@@ -1,7 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../app_controller.dart';
 import '../data/models.dart';
+import '../data/library_store.dart';
+import 'score_badge.dart';
 import 'track_actions.dart';
 import 'artist_navigation.dart';
 import '../downloads/download_record.dart';
@@ -57,12 +62,18 @@ class RatingControls extends StatelessWidget {
     required this.score,
     required this.onVote,
     this.title = 'трек',
+    this.trackId,
     this.compact = false,
+    this.frozen = false,
+    this.onToggleFreeze,
   });
   final int score;
   final ValueChanged<int> onVote;
   final String title;
+  final String? trackId;
   final bool compact;
+  final bool frozen;
+  final VoidCallback? onToggleFreeze;
   @override
   Widget build(BuildContext context) => DecoratedBox(
     decoration: BoxDecoration(
@@ -77,33 +88,20 @@ class RatingControls extends StatelessWidget {
         IconButton(
           tooltip: 'Минус один: $title',
           constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-          onPressed: () => onVote(-1),
+          onPressed: frozen ? null : () => onVote(-1),
           icon: Icon(Icons.remove_rounded, size: compact ? 18 : 24),
         ),
-        SizedBox(
-          width: compact ? 28 : 52,
-          child: Semantics(
-            label: 'Счёт $score',
-            child: ExcludeSemantics(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  '$score',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: compact ? 14 : 17,
-                    fontWeight: FontWeight.w700,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-              ),
-            ),
-          ),
+        ScoreBadge(
+          key: ValueKey(trackId ?? title),
+          score: score,
+          compact: compact,
+          frozen: frozen,
+          onToggleFreeze: onToggleFreeze,
         ),
         IconButton(
           tooltip: 'Плюс один: $title',
           constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-          onPressed: () => onVote(1),
+          onPressed: frozen ? null : () => onVote(1),
           icon: Icon(Icons.add_rounded, size: compact ? 18 : 24),
         ),
       ],
@@ -169,10 +167,32 @@ Future<void> voteWithFeedback(
 ) async {
   try {
     await app.vote(track, delta);
+  } on ScoreFrozenException {
+    if (context.mounted) {
+      notify(context, const ScoreFrozenException().toString());
+    }
   } catch (_) {
     if (context.mounted) {
       notify(context, 'Оценка не сохранилась. Попробуй ещё раз.');
     }
+  }
+}
+
+Future<void> toggleScoreFreezeWithFeedback(
+  BuildContext context,
+  AppController app,
+  Track track,
+) async {
+  try {
+    await app.toggleScoreFreeze(track);
+  } catch (_) {
+    if (context.mounted) {
+      notify(context, 'Фиксация не сохранилась. Попробуй ещё раз.');
+    }
+    return;
+  }
+  if (context.mounted) {
+    unawaited(HapticFeedback.mediumImpact().catchError((_) {}));
   }
 }
 
@@ -304,6 +324,10 @@ class TrackTile extends StatelessWidget {
             RatingControls(
               compact: true,
               score: app.scoreFor(track),
+              trackId: track.id,
+              frozen: app.scoreFrozen(track),
+              onToggleFreeze: () =>
+                  toggleScoreFreezeWithFeedback(context, app, track),
               title: track.title,
               onVote: (delta) => voteWithFeedback(context, app, track, delta),
             ),

@@ -407,10 +407,10 @@ class MusicHandler extends BaseAudioHandler with SeekHandler {
     id: '${t.id}:$index',
     title: t.title,
     artist:
-        '${t.artists.isEmpty ? '' : '${t.artists} · '}Баллы: ${trackScore(t.id, _notificationRatings)}',
+        '${t.artists.isEmpty ? '' : '${t.artists} · '}Баллы: ${trackScore(t.id, _notificationRatings)}${_notificationRatings[t.id]?.frozen == true ? ' · Зафиксирован' : ''}',
     displayTitle: t.title,
     displaySubtitle:
-        '${t.artists.isEmpty ? '' : '${t.artists} · '}Баллы: ${trackScore(t.id, _notificationRatings)}',
+        '${t.artists.isEmpty ? '' : '${t.artists} · '}Баллы: ${trackScore(t.id, _notificationRatings)}${_notificationRatings[t.id]?.frozen == true ? ' · Зафиксирован' : ''}',
     duration: Duration(seconds: t.duration),
     artUri: t.imageUrl == null ? null : Uri.tryParse(t.imageUrl!),
     extras: {'trackId': t.id},

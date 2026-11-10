@@ -43,9 +43,10 @@ class LibraryDisplayOrder {
       tracks = [
         for (final track in tracks)
           if (_eligible.putIfAbsent(
-            track.id,
-            () => filter.matches(track, ratings),
-          ))
+                track.id,
+                () => filter.matchesConditions(track, ratings),
+              ) &&
+              filter.matchesFreeze(track, ratings))
             track,
       ];
     }

@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import 'models.dart';
 
 part 'score_store.dart';
+part 'score_freeze_store.dart';
 
 class LibraryStore {
   LibraryStore(this.db);
@@ -59,6 +60,9 @@ class LibraryStore {
     }
     final id = const Uuid().v4();
     await db.transaction((txn) async {
+      if (await _scoreFrozen(txn, account, track.id)) {
+        throw const ScoreFrozenException();
+      }
       await txn.insert('score_bases', {
         'account': account,
         'track': track.id,
@@ -81,27 +85,44 @@ class LibraryStore {
   }
 
   Future<void> undo(String account, String id) async {
-    await db.update(
-      'votes',
-      {'undone': 1},
-      where: 'account=? AND id=?',
-      whereArgs: [account, id],
-    );
+    await db.transaction((txn) async {
+      final rows = await txn.query(
+        'votes',
+        columns: ['track'],
+        where: 'account=? AND id=?',
+        whereArgs: [account, id],
+      );
+      if (rows.isNotEmpty &&
+          await _scoreFrozen(txn, account, rows.first['track'] as String)) {
+        throw const ScoreFrozenException();
+      }
+      await txn.update(
+        'votes',
+        {'undone': 1},
+        where: 'account=? AND id=?',
+        whereArgs: [account, id],
+      );
+    });
   }
 
-  Future<Map<String, Rating>> ratings(String account) async {
-    final rows = await db.rawQuery(
-      'SELECT b.track, b.base + COALESCE(v.score,0) AS score, COALESCE(v.count,0) AS count FROM score_bases b LEFT JOIN (SELECT account,track,SUM(delta) AS score,COUNT(*) AS count FROM votes WHERE undone=0 GROUP BY account,track) v ON v.account=b.account AND v.track=b.track WHERE b.account=?',
-      [account],
-    );
-    return {
-      for (final row in rows)
-        row['track'] as String: Rating(
-          row['score'] as int,
-          row['count'] as int,
-        ),
-    };
-  }
+  Future<Map<String, Rating>> ratings(String account) =>
+      db.transaction((txn) async {
+        final rows = await txn.rawQuery(
+          'SELECT b.track, b.base + COALESCE(v.score,0) AS score, COALESCE(v.count,0) AS count FROM score_bases b LEFT JOIN (SELECT account,track,SUM(delta) AS score,COUNT(*) AS count FROM votes WHERE undone=0 GROUP BY account,track) v ON v.account=b.account AND v.track=b.track WHERE b.account=?',
+          [account],
+        );
+        final frozen = await _frozenScores(txn, account);
+        return {
+          for (final id in frozen)
+            id: const Rating(initialTrackScore, 0, frozen: true),
+          for (final row in rows)
+            row['track'] as String: Rating(
+              row['score'] as int,
+              row['count'] as int,
+              frozen: frozen.contains(row['track']),
+            ),
+        };
+      });
 
   Future<void> put(String account, String key, dynamic value) async {
     await db.insert('state', {
@@ -168,6 +189,7 @@ class LibraryStore {
     return const JsonEncoder.withIndent('  ').convert({
       'version': 2,
       'account': account,
+      'frozenTracks': (await _frozenScores(db, account)).toList()..sort(),
       'baselines': {for (final row in bases) row['track']: row['base']},
       'orders': {
         for (final row in orders)
@@ -209,6 +231,10 @@ class LibraryStore {
       );
     }
     final events = <Map<String, Object?>>[];
+    final frozen = raw['frozenTracks'] ?? const <String>[];
+    if (frozen is! List || frozen.any((id) => id is! String || id.isEmpty)) {
+      throw const FormatException('В копии повреждены зафиксированные баллы');
+    }
     final Map<String, int> bases;
     if (raw['version'] == 2) {
       final values = raw['baselines'];
@@ -310,6 +336,13 @@ class LibraryStore {
         }
       }
       // Existing local arrangements win; a backup fills lists not arranged here.
+      for (final id in frozen.toSet()) {
+        await txn.insert('state', {
+          'account': account,
+          'key': '$_scoreFreezePrefix$id',
+          'value': 'true',
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      }
       for (final entry in orders.entries) {
         await txn.insert('state', {
           'account': account,

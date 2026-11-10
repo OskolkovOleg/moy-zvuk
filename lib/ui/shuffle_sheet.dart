@@ -13,20 +13,24 @@ class ShuffleSelection {
     Set<GenreGroup> genres, {
     this.limitScores = true,
     this.censoredOnly = false,
+    this.scoreFreeze = ScoreFreezeFilter.all,
   }) : genres = Set.unmodifiable(genres);
   final ScoreRange scores;
   final Set<GenreGroup> genres;
   final bool limitScores;
   final bool censoredOnly;
+  final ScoreFreezeFilter scoreFreeze;
   LibraryFilter get filter => LibraryFilter(
     minScore: limitScores ? scores.min : null,
     maxScore: limitScores ? scores.max : null,
     genres: genres,
     censoredOnly: censoredOnly,
+    scoreFreeze: scoreFreeze,
   );
 
   String titleFor(String title) => [
     title,
+    if (scoreFreeze != ScoreFreezeFilter.all) scoreFreeze.label,
     if (censoredOnly) 'Цензурные',
     if (genres.isNotEmpty) genres.map((g) => g.label).join(', '),
   ].join(' · ');
@@ -55,6 +59,7 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
   late final int actualLowest, actualHighest;
   late bool limitScores;
   late bool censoredOnly;
+  late ScoreFreezeFilter scoreFreeze;
   late ScoreRange range;
   final selectedGenres = <GenreGroup>{};
   late final Set<GenreGroup> availableGenres;
@@ -70,6 +75,7 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
         : scores.reduce(math.max);
     final initial = widget.initialFilter;
     censoredOnly = initial.censoredOnly;
+    scoreFreeze = initial.scoreFreeze;
     lowest = [
       actualLowest,
       initial.minScore ?? actualLowest,
@@ -92,6 +98,7 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
   void reset() => setState(() {
     selectedGenres.clear();
     censoredOnly = false;
+    scoreFreeze = ScoreFreezeFilter.all;
     range = ScoreRange(actualLowest, actualHighest);
     limitScores = !widget.libraryMode;
   });
@@ -103,20 +110,23 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
       selectedGenres,
       limitScores: limitScores,
       censoredOnly: censoredOnly,
+      scoreFreeze: scoreFreeze,
     ),
   );
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final matches = filterTracksByGenreAndScore(
-      widget.tracks,
-      widget.ratings,
-      groups: selectedGenres,
+    final filter = LibraryFilter(
+      genres: selectedGenres,
       censoredOnly: censoredOnly,
+      scoreFreeze: scoreFreeze,
       minScore: limitScores ? range.min : null,
       maxScore: limitScores ? range.max : null,
-    ).length;
+    );
+    final matches = widget.tracks
+        .where((t) => filter.matches(t, widget.ratings))
+        .length;
     final unknownCount = widget.tracks.where((t) => t.explicit == null).length;
     Widget bound(String title, int value, Key key) => Expanded(
       child: Column(
@@ -230,6 +240,34 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
                               );
                             }),
                     ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Фиксация баллов',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final value in ScoreFreezeFilter.values)
+                          ChoiceChip(
+                            key: ValueKey('filter-freeze-${value.name}'),
+                            label: Text(value.label),
+                            selected: scoreFreeze == value,
+                            onSelected: (_) =>
+                                setState(() => scoreFreeze = value),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Удержи цифру балла у песни, чтобы зафиксировать или снять фиксацию.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
                     if (availableGenres.isNotEmpty || widget.libraryMode) ...[
                       const SizedBox(height: 12),
                       Text(
@@ -315,7 +353,9 @@ class _ShuffleSheetState extends State<ShuffleSheet> {
                 children: [
                   Text(
                     matches == 0
-                        ? selectedGenres.isEmpty && !censoredOnly
+                        ? selectedGenres.isEmpty &&
+                                  !censoredOnly &&
+                                  scoreFreeze == ScoreFreezeFilter.all
                               ? 'В этом диапазоне нет песен'
                               : 'Нет песен с такими параметрами'
                         : 'Подходит ${trackCountLabel(matches)}',

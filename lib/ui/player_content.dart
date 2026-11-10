@@ -93,7 +93,7 @@ class _PlayerContent extends StatelessWidget {
       children: [
         Expanded(
           child: Text(
-            'Твой счёт',
+            app.scoreFrozen(track) ? 'Балл зафиксирован' : 'Твой счёт',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant),
@@ -101,6 +101,10 @@ class _PlayerContent extends StatelessWidget {
         ),
         RatingControls(
           score: app.scoreFor(track),
+          trackId: track.id,
+          frozen: app.scoreFrozen(track),
+          onToggleFreeze: () =>
+              toggleScoreFreezeWithFeedback(context, app, track),
           title: track.title,
           onVote: (delta) => voteWithFeedback(context, app, track, delta),
         ),

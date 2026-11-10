@@ -18,6 +18,7 @@ import 'playback/shuffle_tracks.dart';
 part 'personal_controller.dart';
 part 'score_library_controller.dart';
 part 'library_listening_controller.dart';
+part 'score_freeze_controller.dart';
 
 class AppController extends ChangeNotifier {
   AppController(
@@ -102,11 +103,14 @@ class AppController extends ChangeNotifier {
   void _notifySavedCatalog() => notifyListeners();
   bool serverBusy = false;
   Future<void> _edits = Future.value();
+  Future<void> _scoreEdits = Future.value();
   bool isFavorite(String id) => favoriteTracks.any((t) => t.id == id);
   bool owns(PlaylistInfo p) => p.ownerId != null && p.ownerId == account?.id;
   bool hasPlaylist(String id) => playlists.any((p) => p.id == id);
 
   int scoreFor(Track track) => trackScore(track.id, ratings);
+  bool scoreFrozen(Track track) => ratings[track.id]?.frozen ?? false;
+  Future<void> toggleScoreFreeze(Track track) => _toggleScoreFreeze(track);
 
   RatingPosition? positionFor(Track track) =>
       ratingPosition(tracks, ratings, track.id);
@@ -380,8 +384,7 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<String> vote(Track track, int delta) async {
-    final id = account!.id;
+  Future<String> vote(Track track, int delta) => _scoreEdit((id) async {
     ++_catalogRevision;
     ++_ratingRevision;
     final event = await store.vote(id, track, delta, addToLibrary: delta > 0);
@@ -396,7 +399,7 @@ class AppController extends ChangeNotifier {
       if (delta > 0) unawaited(syncLibraryAdds());
     }
     return event;
-  }
+  });
 
   Future<void> undo(String accountId, String event) async {
     if (account?.id == accountId) ++_ratingRevision;

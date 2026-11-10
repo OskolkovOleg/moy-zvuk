@@ -14,6 +14,7 @@ extension _NotificationControls on MusicHandler {
     MediaControl.skipToNext,
     if (_account != null &&
         playlist.current != null &&
+        _notificationRatings[playlist.current!.id]?.frozen != true &&
         onNotificationVote != null) ...[
       MediaControl.custom(
         androidIcon: 'drawable/ic_rating_minus',
@@ -44,6 +45,7 @@ extension _NotificationControls on MusicHandler {
     final account = _account, track = playlist.current;
     final vote = onNotificationVote;
     if (account == null || track == null || vote == null) return false;
+    if (_notificationRatings[track.id]?.frozen == true) return false;
     final delta = name == _ratingActionName(-1)
         ? -1
         : name == _ratingActionName(1)
@@ -53,6 +55,8 @@ extension _NotificationControls on MusicHandler {
     try {
       await vote(account, track, delta);
       return true;
+    } on ScoreFrozenException {
+      return false;
     } catch (_) {
       error.value = 'Оценка не сохранилась. Попробуй ещё раз.';
       return false;

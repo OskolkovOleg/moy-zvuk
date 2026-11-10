@@ -52,6 +52,15 @@ Future<void> openTrackActions(
               ),
               ('next', Icons.playlist_play_rounded, 'Следующим'),
               ('last', Icons.playlist_add_rounded, 'В конец очереди'),
+              (
+                'freeze',
+                app.scoreFrozen(track)
+                    ? Icons.lock_open_rounded
+                    : Icons.ac_unit_rounded,
+                app.scoreFrozen(track)
+                    ? 'Снять фиксацию балла'
+                    : 'Зафиксировать балл',
+              ),
               ('radio', Icons.sensors_rounded, 'Поток по песне'),
               ('discover', Icons.explore_outlined, 'Открытия по этой песне'),
               (
@@ -85,6 +94,8 @@ Future<void> openTrackActions(
   if (value == null || !context.mounted) return;
   try {
     switch (value) {
+      case 'freeze':
+        await toggleScoreFreezeWithFeedback(context, app, track);
       case 'download':
         final current = downloads.forTrack(track.id);
         if (current?.state == DownloadState.ready || current?.active == true) {

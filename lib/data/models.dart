@@ -163,8 +163,9 @@ class SearchPage {
 }
 
 class Rating {
-  const Rating(this.score, this.count);
+  const Rating(this.score, this.count, {this.frozen = false});
   final int score, count;
+  final bool frozen;
 }
 
 // A fixed baseline, not a vote: reopening or importing must never add it again.
