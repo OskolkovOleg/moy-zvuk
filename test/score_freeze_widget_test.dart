@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:audio_service/audio_service.dart' hide Rating;
+import 'package:just_audio/just_audio.dart';
 import 'package:zvuk_personal/app_controller.dart';
 import 'package:zvuk_personal/data/library_filter.dart';
 import 'package:zvuk_personal/data/library_store.dart';
@@ -9,7 +11,9 @@ import 'package:zvuk_personal/data/models.dart';
 import 'package:zvuk_personal/downloads/download_manager.dart';
 import 'package:zvuk_personal/playback/music_handler.dart';
 import 'package:zvuk_personal/playback/playback_queue.dart';
+import 'package:zvuk_personal/playback/sleep_timer.dart';
 import 'package:zvuk_personal/ui/library_screen.dart';
+import 'package:zvuk_personal/ui/player_sheet.dart';
 import 'package:zvuk_personal/ui/score_badge.dart';
 import 'package:zvuk_personal/ui/theme.dart';
 import 'package:zvuk_personal/ui/widgets.dart';
@@ -21,7 +25,14 @@ class _Store implements LibraryStore {
   dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
 }
 
-class _Music implements MusicHandler {
+class _Player implements AudioPlayer {
+  @override
+  Stream<Duration> get positionStream => const Stream.empty();
+  @override
+  dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
+}
+
+class _Music extends BaseAudioHandler implements MusicHandler {
   _Music(LibraryStore store)
     : downloads = DownloadManager(store, directory: Directory.systemTemp);
   @override
@@ -32,6 +43,26 @@ class _Music implements MusicHandler {
   final error = ValueNotifier<String?>(null);
   @override
   final playlist = PlaybackQueue();
+  @override
+  final player = _Player();
+  @override
+  Duration get duration => const Duration(minutes: 3);
+  @override
+  Duration get position => const Duration(seconds: 30);
+  @override
+  bool get loading => false;
+  @override
+  bool get isShuffled => false;
+  @override
+  bool get isWave => false;
+  @override
+  bool get canSkipNext => playlist.hasNext;
+  @override
+  String get sourceTitle => 'Мои песни';
+  @override
+  AudioServiceRepeatMode get repeatMode => AudioServiceRepeatMode.none;
+  @override
+  final sleepTimer = SleepTimerState();
   @override
   Future<void> Function(String, Track, int)? onNotificationVote;
   List<Track> played = [];
@@ -86,11 +117,12 @@ void main() {
       ..favoriteTracks = [a, b]
       ..ratings = {'a': const Rating(10, 1), 'b': const Rating(12, 3)};
   });
-  tearDown(() {
+  tearDown(() async {
     app.dispose();
     music.downloads.dispose();
     music.error.dispose();
     music.revision.dispose();
+    await music.playbackState.close();
   });
   Future<void> show(WidgetTester tester) => tester.pumpWidget(
     RepaintBoundary(
@@ -106,6 +138,53 @@ void main() {
       ),
     ),
   );
+
+  for (final large in [false, true]) {
+    testWidgets(
+      'Current player freeze at ${large ? '320dp enlarged' : '360dp'} preserves playback controls and song',
+      (tester) async {
+        tester.view.physicalSize = Size(large ? 640 : 720, 1440);
+        tester.view.devicePixelRatio = 2;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        if (large) {
+          tester.platformDispatcher.textScaleFactorTestValue = 1.6;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        }
+        music.playlist.replace([a, b], 0);
+        music.playbackState.add(
+          PlaybackState(
+            playing: true,
+            processingState: AudioProcessingState.ready,
+          ),
+        );
+        await tester.pumpWidget(
+          RepaintBoundary(
+            key: captureKey,
+            child: MaterialApp(theme: appTheme(), home: PlayerSheet(app)),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.longPress(find.byType(ScoreBadge));
+        await tester.pumpAndSettle();
+        expect(app.scoreFrozen(a), true);
+        expect(find.text('Балл зафиксирован'), findsOneWidget);
+        expect(find.byTooltip('Пауза'), findsOneWidget);
+        expect(music.playbackState.value.playing, true);
+        expect(music.playlist.current!.id, 'a');
+        expect(app.scoreFor(a), 10);
+        await captureUi(
+          tester,
+          large ? 'score-frozen-player-320-large' : 'score-frozen-player-360',
+        );
+        await tester.longPress(find.byType(ScoreBadge));
+        await tester.pumpAndSettle();
+        expect(app.scoreFrozen(a), false);
+        expect(find.text('Твой счёт'), findsOneWidget);
+        expect(tester.takeException(), null);
+      },
+    );
+  }
 
   testWidgets(
     'Holding the score freezes and unfreezes without playing or moving the row',
