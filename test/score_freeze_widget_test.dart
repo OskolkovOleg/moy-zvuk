@@ -127,23 +127,18 @@ void main() {
       expect(app.scoreFor(a), 10);
       expect(music.played, isEmpty);
       expect(tester.getRect(score), rect);
-      expect(
-        tester
-            .widget<IconButton>(find.byTooltip('Плюс один: На своём уровне'))
-            .onPressed,
-        isNull,
+      final plus = find.byWidgetPredicate(
+        (widget) =>
+            widget is IconButton &&
+            widget.tooltip == 'Плюс один: На своём уровне',
       );
+      expect(tester.widget<IconButton>(plus).onPressed, isNull);
       expect(find.byType(SnackBar), findsNothing);
       await captureUi(tester, 'score-frozen-library-360');
       await tester.longPress(score);
       await tester.pumpAndSettle();
       expect(app.scoreFrozen(a), false);
-      expect(
-        tester
-            .widget<IconButton>(find.byTooltip('Плюс один: На своём уровне'))
-            .onPressed,
-        isNotNull,
-      );
+      expect(tester.widget<IconButton>(plus).onPressed, isNotNull);
       expect(music.played, isEmpty);
       expect(tester.takeException(), null);
     },
