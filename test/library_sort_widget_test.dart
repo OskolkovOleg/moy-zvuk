@@ -19,14 +19,22 @@ import 'ui_capture.dart';
 
 class _Store implements LibraryStore {
   @override
+  Future<dynamic> get(String account, String key) async =>
+      key == 'favorites-newest-first-v1' ? true : null;
+  @override
   dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
 }
 
 class _Stats implements ListeningStatsStore {
   _Stats(this.stats);
   final ListeningStats stats;
+  int loads = 0;
   @override
-  Future<ListeningStats> load(String account, {DateTime? now}) async => stats;
+  Future<ListeningStats> load(String account, {DateTime? now}) async {
+    loads++;
+    return stats;
+  }
+
   @override
   dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
 }
@@ -66,6 +74,7 @@ void main() {
   late LibraryStore store;
   late AppController app;
   late _Music music;
+  late _Stats history;
   const a = Track(id: 'a', title: 'Часто слушаю', artists: 'Первый'),
       b = Track(id: 'b', title: 'Один запуск', artists: 'Второй'),
       c = Track(id: 'c', title: 'Без запусков за неделю', artists: 'Третий');
@@ -82,7 +91,8 @@ void main() {
       ],
     );
     music = _Music(store);
-    app = AppController(store, music, historyStatsStore: _Stats(stats))
+    history = _Stats(stats);
+    app = AppController(store, music, historyStatsStore: history)
       ..account = const Account('owner', 'Fixture')
       ..tracks = [a, b, c]
       ..favoriteTracks = [a, b, c]
@@ -168,6 +178,55 @@ void main() {
     await tester.tap(find.byKey(const Key('library-sort')));
     await tester.pumpAndSettle();
     await captureUi(tester, 'library-sort-menu-320-large');
+    await tester.tap(find.byKey(const ValueKey('sort-newest')));
+    await tester.pumpAndSettle();
+    await captureUi(tester, 'library-newest-320-large');
     expect(tester.takeException(), null);
   });
+  testWidgets(
+    'Newest applies filters, skips history and plays the displayed order',
+    (tester) async {
+      tester.view.physicalSize = const Size(720, 1440);
+      tester.view.devicePixelRatio = 2;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      app.tracks = app.favoriteTracks = [c, a, b];
+      app.ratings['b'] = const Rating(12, 3, frozen: true);
+      app.setLibraryFilter(
+        LibraryFilter(
+          minScore: 10,
+          maxScore: 13,
+          scoreFreeze: ScoreFreezeFilter.unfrozen,
+        ),
+      );
+      await show(tester);
+      await tester.tap(find.byKey(const Key('library-sort')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('sort-newest')));
+      await tester.pumpAndSettle();
+      expect(app.librarySort, LibrarySort.newest);
+      expect(app.visibleTracks.map((t) => t.id), ['c', 'a']);
+      expect(history.loads, 0);
+      expect(find.text('По порядку добавления в Звук'), findsOneWidget);
+      expect(music.played, isEmpty);
+      await captureUi(tester, 'library-newest-360');
+      await tester.tap(find.byKey(const Key('play-from-top')));
+      await tester.pumpAndSettle();
+      expect(music.played.map((t) => t.id), ['c', 'a']);
+      expect(tester.takeException(), null);
+    },
+  );
+
+  testWidgets(
+    'Playlist sort menu does not mislabel custom order as addition date',
+    (tester) async {
+      app.listId = 'custom-playlist';
+      await show(tester);
+      await tester.tap(find.byKey(const Key('library-sort')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('sort-newest')), findsNothing);
+      expect(find.byKey(const ValueKey('sort-scores')), findsOneWidget);
+      expect(tester.takeException(), null);
+    },
+  );
 }

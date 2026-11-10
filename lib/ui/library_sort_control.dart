@@ -23,17 +23,22 @@ class LibrarySortButton extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const ListTile(title: Text('Сортировка')),
-                for (final sort in LibrarySort.values)
+                for (final sort in LibrarySort.values.where(
+                  (sort) => sort != LibrarySort.newest || list == 'favorites',
+                ))
                   ListTile(
                     key: ValueKey('sort-${sort.name}'),
                     leading: Icon(switch (sort) {
                       LibrarySort.scores => Icons.leaderboard_outlined,
+                      LibrarySort.newest => Icons.playlist_add_rounded,
                       LibrarySort.oldest => Icons.history_rounded,
                       LibrarySort.leastPlayed => Icons.date_range_rounded,
                     }),
                     title: Text(sort.label),
                     subtitle: Text(switch (sort) {
                       LibrarySort.scores => 'Сначала больше баллов',
+                      LibrarySort.newest =>
+                        'Последние добавленные в «Мои песни»',
                       LibrarySort.oldest => 'Сначала самые давние прослушивания. Без даты — в конце.',
                       LibrarySort.leastPlayed =>
                         'Меньше запусков в этом приложении за последние 7 дней',
@@ -69,7 +74,9 @@ class LibrarySortSummary extends StatelessWidget {
     final unknown = app.visibleTracks
         .where((t) => stats?.last[t.id] == null)
         .length;
-    final description = sort == LibrarySort.oldest
+    final description = sort == LibrarySort.newest
+        ? 'По порядку добавления в Звук'
+        : sort == LibrarySort.oldest
         ? (unknown == 0
               ? 'Сначала самые давние прослушивания'
               : 'Без даты: $unknown — в конце списка')
@@ -89,9 +96,10 @@ class LibrarySortSummary extends StatelessWidget {
           ),
           const SizedBox(height: 3),
           Text(
-            app.libraryHistoryLoading
+            sort.needsListeningStats && app.libraryHistoryLoading
                 ? 'Обновляем историю…'
-                : app.libraryHistoryError ?? description,
+                : (sort.needsListeningStats ? app.libraryHistoryError : null) ??
+                      description,
             key: const Key('library-sort-description'),
             style: TextStyle(
               fontSize: 12,

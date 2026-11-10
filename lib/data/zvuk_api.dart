@@ -269,7 +269,7 @@ class ZvukApi {
   Future<List<String>> favoriteIds() async {
     final data = await _graph(
       'userCollection',
-      'query userCollection { collection { tracks { id } } }',
+      'query userCollection { collection { tracks(orderBy: dateAdded, orderDirection: desc) { id } } }',
     );
     return (data['collection']['tracks'] as List)
         .map((e) => e['id'].toString())

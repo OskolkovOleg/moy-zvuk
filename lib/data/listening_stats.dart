@@ -1,10 +1,14 @@
 import 'models.dart';
 
-enum LibrarySort { scores, oldest, leastPlayed }
+enum LibrarySort { scores, newest, oldest, leastPlayed }
 
 extension LibrarySortLabel on LibrarySort {
+  bool get needsListeningStats =>
+      this == LibrarySort.oldest || this == LibrarySort.leastPlayed;
+
   String get label => switch (this) {
     LibrarySort.scores => 'По баллам',
+    LibrarySort.newest => 'Сначала новые',
     LibrarySort.oldest => 'Давно не слушал',
     LibrarySort.leastPlayed => 'Реже за 7 дней',
   };
@@ -75,6 +79,9 @@ List<Track> sortedLibraryTracks(
   ListeningStats? stats,
   DateTime? now,
 }) {
+  // Source order is the collection’s explicit dateAdded DESC order, cached
+  // unchanged. Scores and listening dates do not define addition dates.
+  if (sort == LibrarySort.newest) return List.of(tracks);
   final ranked = rankedTracks(tracks, ratings);
   if (sort == LibrarySort.scores || stats == null) return ranked;
   final time = now ?? DateTime.now();

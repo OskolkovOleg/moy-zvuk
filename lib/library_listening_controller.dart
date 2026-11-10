@@ -22,19 +22,55 @@ extension LibraryListening on AppController {
 
   Future<void> setLibrarySort(LibrarySort sort) async {
     librarySort;
+    final request = ++_sortRequest;
+    if (sort == LibrarySort.newest) {
+      final id = account?.id, selected = listId, selection = _selection;
+      if (id == null || selected != 'favorites') return;
+      bool current() =>
+          !_disposed &&
+          request == _sortRequest &&
+          account?.id == id &&
+          listId == selected &&
+          _selection == selection;
+      try {
+        var known = await store.hasFavoriteAdditionOrder(id);
+        if (!current()) return;
+        if (!known) {
+          await refresh();
+          if (!current()) return;
+          known = await store.hasFavoriteAdditionOrder(id);
+          if (!current()) return;
+        }
+        if (!known) {
+          message = busy || serverBusy
+              ? 'Библиотека ещё обновляется. Повтори выбор после обновления.'
+              : 'Обнови библиотеку при подключении к интернету, чтобы получить порядок добавления.';
+          notifyListeners();
+          return;
+        }
+      } catch (_) {
+        if (current()) {
+          message = 'Не удалось прочитать порядок добавления. Попробуй обновить библиотеку.';
+          notifyListeners();
+        }
+        return;
+      }
+      message = null;
+    }
+    if (_disposed) return;
     _librarySort = sort;
     ++_historyRequest;
     libraryHistoryLoading = false;
     libraryHistoryError = null;
     resortLibrary(reloadHistory: false);
-    if (sort != LibrarySort.scores) {
+    if (sort.needsListeningStats) {
       await refreshLibraryListening(remote: sort == LibrarySort.oldest);
     }
   }
 
   Future<void> refreshLibraryListening({bool remote = false}) async {
     final sort = librarySort, id = account?.id, selected = listId;
-    if (id == null || sort == LibrarySort.scores) return;
+    if (id == null || !sort.needsListeningStats) return;
     final request = ++_historyRequest,
         revision = _ratingRevision,
         session = api;

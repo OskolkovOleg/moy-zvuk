@@ -138,7 +138,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
     );
     final waitingForStats =
-        app.librarySort != LibrarySort.scores &&
+        app.librarySort.needsListeningStats &&
         app.libraryHistoryLoading &&
         app.listeningStats == null;
     final playButton = IconButton.filled(

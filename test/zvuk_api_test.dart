@@ -159,6 +159,12 @@ void main() {
         'test',
         client: MockClient((req) async {
           final name = jsonDecode(req.body)['operationName'];
+          if (name == 'userCollection') {
+            expect(
+              jsonDecode(req.body)['query'],
+              contains('tracks(orderBy: dateAdded, orderDirection: desc)'),
+            );
+          }
           if (name == 'getTracks') {
             expect(jsonDecode(req.body)['variables']['ids'], ['3', '1', '2']);
           }

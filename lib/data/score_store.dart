@@ -95,6 +95,9 @@ Future<void> _collectTrack(
 }
 
 extension ScoreLibraryStore on LibraryStore {
+  Future<bool> hasFavoriteAdditionOrder(String account) async =>
+      await get(account, 'favorites-newest-first-v1') == true;
+
   Future<List<Track>> pendingFavoriteAdds(String account) async =>
       _uniqueFavoriteTracks(
         await _storedTracks(db, account, 'pending-favorite-adds'),
@@ -124,10 +127,17 @@ extension ScoreLibraryStore on LibraryStore {
         );
         final remoteIds = remote.map((t) => t.id).toSet();
         final merged = _uniqueFavoriteTracks([
-          ...pending.where((t) => !remoteIds.contains(t.id)),
+          ...pending.reversed.where((t) => !remoteIds.contains(t.id)),
           ...remote,
         ]);
         await _writeTracks(txn, account, 'list:favorites', merged);
+        // Only call with the API’s explicit dateAdded DESC response. The marker
+        // and ordered cache commit together; legacy caches remain unknown.
+        await txn.insert('state', {
+          'account': account,
+          'key': 'favorites-newest-first-v1',
+          'value': jsonEncode(true),
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
         return merged;
       });
 }

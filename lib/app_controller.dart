@@ -73,7 +73,7 @@ class AppController extends ChangeNotifier {
   LibrarySort _librarySort = LibrarySort.scores;
   String? _sortAccount, _sortList;
   ListeningStats? _listeningStats;
-  int _historyRequest = 0;
+  int _historyRequest = 0, _sortRequest = 0;
   DateTime? _lastHistoryRemote;
   bool libraryHistoryLoading = false;
   String? libraryHistoryError;
@@ -139,7 +139,7 @@ class AppController extends ChangeNotifier {
     );
     notifyListeners();
     if (reloadHistory &&
-        librarySort != LibrarySort.scores &&
+        librarySort.needsListeningStats &&
         !libraryHistoryLoading) {
       unawaited(
         refreshLibraryListening(
@@ -282,7 +282,7 @@ class AppController extends ChangeNotifier {
     if (_disposed) return;
     final ratingRevision = _ratingRevision;
     resortLibrary(reloadHistory: false);
-    if (librarySort != LibrarySort.scores && !libraryHistoryLoading) {
+    if (librarySort.needsListeningStats && !libraryHistoryLoading) {
       unawaited(
         refreshLibraryListening(remote: librarySort == LibrarySort.oldest),
       );
