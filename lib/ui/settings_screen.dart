@@ -14,6 +14,7 @@ import 'settings_widgets.dart';
 import 'wave_settings.dart';
 import 'widgets.dart';
 import 'translation_info.dart';
+import 'score_distribution_screen.dart';
 
 class ConnectForm extends StatefulWidget {
   const ConnectForm(this.app, {super.key, this.onConnected});
@@ -352,6 +353,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
           SettingsSection(
             title: 'Библиотека и баллы',
             children: [
+              SettingsRow(
+                key: const Key('settings-distribution'),
+                icon: Icons.bar_chart_rounded,
+                title: 'Распределение баллов',
+                subtitle: 'Как устроена твоя библиотека',
+                onTap: app.account == null || app.connecting
+                    ? null
+                    : () => Navigator.of(context).push<void>(
+                        MaterialPageRoute(
+                          builder: (_) => ScoreDistributionScreen(app),
+                        ),
+                      ),
+              ),
               SettingsRow(
                 key: const Key('settings-export'),
                 icon: Icons.ios_share_rounded,
