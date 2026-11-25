@@ -96,7 +96,7 @@ class _ScoreDistributionScreenState extends State<ScoreDistributionScreen> {
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
           children: [
             Text(
-              'Распределение\nбаллов',
+              'Музыка\nв баллах',
               style: Theme.of(context).textTheme.headlineLarge,
             ),
             const SizedBox(height: 12),

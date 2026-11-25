@@ -214,6 +214,7 @@ class ScoreDistributionChart extends StatelessWidget {
                         ),
                       ],
                     ),
+                  ),
             ),
           ],
         );

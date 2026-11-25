@@ -143,6 +143,11 @@ void main() {
             )
             .first,
       );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const Key('settings-distribution')),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('settings-distribution')));
       await tester.pumpAndSettle();
       expect(find.byType(ScoreDistributionScreen), findsOneWidget);
@@ -200,6 +205,11 @@ void main() {
         }
         await show(tester);
         await captureUi(tester, 'distribution-${large ? '320-large' : '360'}');
+        if (large) {
+          await tester.ensureVisible(find.byType(ScoreDistributionChart));
+          await tester.pumpAndSettle();
+          await captureUi(tester, 'distribution-chart-320-large');
+        }
         expect(
           tester.widget<Text>(find.byKey(const Key('distribution-total'))).data,
           '371 песня',
