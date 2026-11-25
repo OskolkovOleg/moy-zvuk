@@ -163,6 +163,33 @@ void main() {
       expect(tester.takeException(), null);
     },
   );
+  testWidgets(
+    'Oldest starts with missing dates and plays the visible filtered order',
+    (tester) async {
+      tester.view.physicalSize = const Size(720, 1440);
+      tester.view.devicePixelRatio = 2;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      app.setLibraryFilter(LibraryFilter(minScore: 10, maxScore: 13));
+      await show(tester);
+      await tester.tap(find.byKey(const Key('library-sort')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Без даты — в начале. Затем самые давние прослушивания.'),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const ValueKey('sort-oldest')));
+      await tester.pumpAndSettle();
+      expect(app.visibleTracks.map((t) => t.id), ['c', 'a', 'b']);
+      expect(find.text('Без даты: 1 — в начале списка'), findsOneWidget);
+      expect(music.played, isEmpty);
+      await captureUi(tester, 'library-oldest-unknown-first-360');
+      await tester.tap(find.byKey(const Key('play-from-top')));
+      await tester.pumpAndSettle();
+      expect(music.played.map((t) => t.id), ['c', 'a', 'b']);
+      expect(tester.takeException(), null);
+    },
+  );
   testWidgets('Oldest summary and sort menu fit 320dp with large text', (
     tester,
   ) async {

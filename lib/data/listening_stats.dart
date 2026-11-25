@@ -101,10 +101,12 @@ List<Track> sortedLibraryTracks(
       if (count != 0) return count;
     }
     final aDate = stats.last[a.value.id], bDate = stats.last[b.value.id];
-    // Missing dates remain unknown and follow dated songs; they are never
-    // represented as ancient dates or as evidence of never having listened.
-    if (aDate == null && bDate != null) return 1;
-    if (aDate != null && bDate == null) return -1;
+    // Oldest prioritizes songs without a saved date. Unknown stays unknown:
+    // no invented timestamp or assertion that the song was never heard.
+    // Weekly frequency keeps its existing dated-first tie breaker.
+    final unknownFirst = sort == LibrarySort.oldest;
+    if (aDate == null && bDate != null) return unknownFirst ? -1 : 1;
+    if (aDate != null && bDate == null) return unknownFirst ? 1 : -1;
     final date = aDate == null ? 0 : aDate.compareTo(bDate!);
     return date != 0 ? date : a.key.compareTo(b.key);
   });

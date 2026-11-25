@@ -20,7 +20,7 @@ void main() {
       c = Track(id: 'c', title: 'C');
   final now = DateTime.utc(2026, 11, 7, 12);
   test(
-    'Oldest orders real dates first; unknown is not an invented old date',
+    'Oldest places missing dates first without inventing listening history',
     () {
       final stats = ListeningStats(
         now,
@@ -33,8 +33,56 @@ void main() {
           sort: LibrarySort.oldest,
           stats: stats,
         ).map((t) => t.id),
-        ['b', 'a', 'c'],
+        ['c', 'b', 'a'],
       );
+      expect(stats.last.containsKey('c'), false);
+    },
+  );
+  test(
+    'Missing-date priority is specific to oldest and keeps stable score ties',
+    () {
+      const d = Track(id: 'd', title: 'D');
+      final stats = ListeningStats(
+        now,
+        last: {'a': now, 'b': now.subtract(const Duration(days: 30))},
+      );
+      final ratings = {
+        'a': const Rating(99, 1),
+        'b': const Rating(1, 1),
+        'c': const Rating(8, 1),
+        'd': const Rating(11, 1),
+      };
+      final source = [c, b, d, a];
+      expect(
+        sortedLibraryTracks(
+          source,
+          ratings,
+          sort: LibrarySort.oldest,
+          stats: stats,
+        ).map((t) => t.id),
+        ['d', 'c', 'b', 'a'],
+      );
+      expect(
+        sortedLibraryTracks(
+          source,
+          ratings,
+          sort: LibrarySort.leastPlayed,
+          stats: stats,
+          now: now,
+        ).map((t) => t.id),
+        ['b', 'a', 'd', 'c'],
+      );
+      ratings['c'] = const Rating(11, 1);
+      expect(
+        sortedLibraryTracks(
+          source,
+          ratings,
+          sort: LibrarySort.oldest,
+          stats: stats,
+        ).map((t) => t.id),
+        ['c', 'd', 'b', 'a'],
+      );
+      expect(stats.last.keys.toSet(), {'a', 'b'});
     },
   );
   test('Frequency uses a rolling seven day window, excludes future dates, and uses dates for ties', () {
@@ -191,11 +239,11 @@ void main() {
       await HistoryStore(store)
           .record('a', a, DateTime.now().subtract(const Duration(days: 1)));
       await app.setLibrarySort(LibrarySort.oldest);
-      expect(app.visibleTracks.map((t) => t.id), ['b', 'a', 'c']);
+      expect(app.visibleTracks.map((t) => t.id), ['c', 'b', 'a']);
       await app.playVisible();
-      expect(music.played.map((t) => t.id), ['b', 'a', 'c']);
+      expect(music.played.map((t) => t.id), ['c', 'b', 'a']);
       await app.vote(b, 1);
-      expect(app.visibleTracks.map((t) => t.id), ['b', 'a', 'c']);
+      expect(app.visibleTracks.map((t) => t.id), ['c', 'b', 'a']);
       app.account = const Account('b', 'Other');
       expect(app.librarySort, LibrarySort.scores);
       expect(app.listeningStats, null);

@@ -39,7 +39,7 @@ class LibrarySortButton extends StatelessWidget {
                       LibrarySort.scores => 'Сначала больше баллов',
                       LibrarySort.newest =>
                         'Последние добавленные в «Мои песни»',
-                      LibrarySort.oldest => 'Сначала самые давние прослушивания. Без даты — в конце.',
+                      LibrarySort.oldest => 'Без даты — в начале. Затем самые давние прослушивания.',
                       LibrarySort.leastPlayed =>
                         'Меньше запусков в этом приложении за последние 7 дней',
                     }),
@@ -79,7 +79,7 @@ class LibrarySortSummary extends StatelessWidget {
         : sort == LibrarySort.oldest
         ? (unknown == 0
               ? 'Сначала самые давние прослушивания'
-              : 'Без даты: $unknown — в конце списка')
+              : 'Без даты: $unknown — в начале списка')
         : stats == null
         ? 'Счётчик запускается с этой версии приложения'
         : stats.fullWeek(now)
