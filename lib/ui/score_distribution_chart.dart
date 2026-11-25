@@ -193,28 +193,30 @@ class ScoreDistributionChart extends StatelessWidget {
                         color: scheme.onSurfaceVariant,
                       ),
                     )
-                  : Wrap(
-                      alignment: WrapAlignment.spaceBetween,
-                      spacing: 16,
-                      runSpacing: 4,
-                      children: [
-                        Text(
-                          'От ${displayScore(bands.first.low)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: scheme.onSurfaceVariant,
+                  : SizedBox(
+                      width: double.infinity,
+                      child: Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        spacing: 16,
+                        runSpacing: 4,
+                        children: [
+                          Text(
+                            'От ${displayScore(bands.first.low)}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: scheme.onSurfaceVariant,
+                            ),
                           ),
-                        ),
-                        Text(
-                          'До ${displayScore(bands.last.high)} баллов',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: scheme.onSurfaceVariant,
+                          Text(
+                            'До ${displayScore(bands.last.high)} баллов',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: scheme.onSurfaceVariant,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
             ),
           ],
         );
