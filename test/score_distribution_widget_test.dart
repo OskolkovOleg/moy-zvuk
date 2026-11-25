@@ -204,19 +204,20 @@ void main() {
           }
         }
         await show(tester);
+        expect(
+          tester.widget<Text>(find.byKey(const Key('distribution-total'))).data,
+          '371 песня',
+        );
         await captureUi(tester, 'distribution-${large ? '320-large' : '360'}');
         if (large) {
           await tester.ensureVisible(find.byType(ScoreDistributionChart));
           await tester.pumpAndSettle();
           await captureUi(tester, 'distribution-chart-320-large');
         }
-        expect(
-          tester.widget<Text>(find.byKey(const Key('distribution-total'))).data,
-          '371 песня',
-        );
         await tester.ensureVisible(
           find.byKey(const Key('distribution-choose-score')),
         );
+        await tester.pumpAndSettle();
         await tester.tap(find.byKey(const Key('distribution-choose-score')));
         await tester.pumpAndSettle();
         await captureUi(
